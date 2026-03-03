@@ -623,6 +623,7 @@ final class GhosttySurfaceRuntime {
         }
 
         if forceRefresh || !scaleApproximatelyEqual(viewport.xScale, appliedBackingScaleFactor) {
+            renderView.layer?.contentsScale = viewport.xScale
             ghostty_surface_set_content_scale(
                 surface,
                 Double(viewport.xScale),

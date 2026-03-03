@@ -44,7 +44,21 @@ Split any pane horizontally or vertically. Resize by dragging dividers. Navigate
 
 ## Install
 
-Download the latest release, open the `.dmg`, and drag mvx to your Applications folder. mvx auto-updates via Sparkle.
+Download the latest release, open the `.dmg`, and drag mvx to your Applications folder.
+
+mvx is not notarized (requires a paid Apple Developer account).
+On first launch macOS will block the app. To open it:
+
+1. Open **System Settings → Privacy & Security**
+2. Scroll to the "Security" section — you'll see a message about mvx being blocked
+3. Click **Open Anyway**
+
+Alternatively, run in Terminal:
+```
+xattr -cr /Applications/mvx.app
+```
+
+mvx auto-updates via Sparkle.
 
 ## Session restore
 

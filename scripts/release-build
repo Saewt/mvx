@@ -11,8 +11,8 @@ EXPORT_DIR="$OUTPUT_DIR/mvx-$VERSION-export"
 STAGING_DIR="$OUTPUT_DIR/mvx-$VERSION-release"
 DMG_PATH="$OUTPUT_DIR/mvx-$VERSION.dmg"
 APP_NAME=${MVX_APP_NAME:-mvx.app}
-ALLOW_UNSIGNED=${MVX_ALLOW_UNSIGNED:-1}
-DEVELOPER_ID_APPLICATION=${MVX_DEVELOPER_ID_APPLICATION:-}
+ALLOW_UNSIGNED=${MVX_ALLOW_UNSIGNED:-0}
+DEVELOPER_ID_APPLICATION=${MVX_DEVELOPER_ID_APPLICATION:--}
 ARCHIVE_DESTINATION=${MVX_ARCHIVE_DESTINATION:-platform=macOS,arch=$(uname -m)}
 ARCHIVE_ARCHS=${MVX_ARCHIVE_ARCHS:-$(uname -m)}
 
@@ -27,12 +27,19 @@ sign_path() {
   PATH_TO_SIGN=$1
 
   echo "==> Signing $(basename "$PATH_TO_SIGN")"
-  codesign \
-    --force \
-    --timestamp \
-    --options runtime \
-    --sign "$DEVELOPER_ID_APPLICATION" \
-    "$PATH_TO_SIGN"
+  if [ "$DEVELOPER_ID_APPLICATION" != "-" ]; then
+    codesign \
+      --force \
+      --timestamp \
+      --options runtime \
+      --sign "$DEVELOPER_ID_APPLICATION" \
+      "$PATH_TO_SIGN"
+  else
+    codesign \
+      --force \
+      --sign "-" \
+      "$PATH_TO_SIGN"
+  fi
 }
 
 sign_app_bundle() {
@@ -62,7 +69,12 @@ sign_app_bundle() {
 
   echo "==> Verifying app signature"
   codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE"
-  spctl -a -vv -t execute "$APP_BUNDLE"
+
+  if [ "$DEVELOPER_ID_APPLICATION" != "-" ]; then
+    spctl -a -vv -t execute "$APP_BUNDLE"
+  else
+    echo "    (skipping spctl — ad-hoc signatures are not accepted by Gatekeeper)"
+  fi
 }
 
 mkdir -p "$OUTPUT_DIR"
@@ -129,7 +141,12 @@ if [ "$ALLOW_UNSIGNED" != "1" ]; then
 
   echo "==> Verifying DMG signature"
   codesign --verify --verbose=2 "$DMG_PATH"
-  spctl -a -vv -t open "$DMG_PATH"
+
+  if [ "$DEVELOPER_ID_APPLICATION" != "-" ]; then
+    spctl -a -vv -t open "$DMG_PATH"
+  else
+    echo "    (skipping spctl — ad-hoc signatures are not accepted by Gatekeeper)"
+  fi
 fi
 
 MANIFEST_PATH="$OUTPUT_DIR/release-manifest.json"

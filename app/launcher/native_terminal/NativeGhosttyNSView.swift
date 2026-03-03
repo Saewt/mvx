@@ -370,6 +370,7 @@ final class NativeGhosttyNSView: NSView {
         }
 
         runtime?.reassertDisplayID()
+        _ = reconcileGeometryNow(forceRefresh: true)
         NativeGhosttyGeometryCoordinator.shared.scheduleGeometryReconcile(forceRefresh: true)
     }
 }
