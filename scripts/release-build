@@ -1,0 +1,91 @@
+#!/bin/sh
+set -eu
+
+ROOT_DIR=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
+VERSION=${MVX_RELEASE_VERSION:-0.1.0}
+BUILD=${MVX_BUILD_NUMBER:-1}
+OUTPUT_DIR=${MVX_OUTPUT_DIR:-"$ROOT_DIR/.build/release"}
+DERIVED_DATA=${MVX_DERIVED_DATA:-"$ROOT_DIR/.build/DerivedData"}
+ARCHIVE_PATH="$OUTPUT_DIR/mvx-$VERSION-$BUILD.xcarchive"
+EXPORT_DIR="$OUTPUT_DIR/mvx-$VERSION-export"
+STAGING_DIR="$OUTPUT_DIR/mvx-$VERSION-release"
+DMG_PATH="$OUTPUT_DIR/mvx-$VERSION.dmg"
+APP_NAME=${MVX_APP_NAME:-mvx.app}
+ALLOW_UNSIGNED=${MVX_ALLOW_UNSIGNED:-1}
+
+mkdir -p "$OUTPUT_DIR"
+rm -rf "$ARCHIVE_PATH" "$EXPORT_DIR" "$STAGING_DIR"
+
+ARCHIVE_ARGS=""
+if [ "$ALLOW_UNSIGNED" = "1" ]; then
+  ARCHIVE_ARGS="CODE_SIGNING_ALLOWED=NO"
+fi
+
+EXPORT_OPTIONS="$OUTPUT_DIR/exportOptions.plist"
+cat > "$EXPORT_OPTIONS" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>method</key>
+  <string>developer-id</string>
+  <key>signingStyle</key>
+  <string>manual</string>
+</dict>
+</plist>
+EOF
+
+echo "==> Archiving mvx"
+xcodebuild \
+  -project "$ROOT_DIR/mvx.xcodeproj" \
+  -scheme Mvx \
+  -configuration Release \
+  -derivedDataPath "$DERIVED_DATA" \
+  -archivePath "$ARCHIVE_PATH" \
+  archive \
+  $ARCHIVE_ARGS
+
+APP_SOURCE="$ARCHIVE_PATH/Products/Applications/$APP_NAME"
+if [ ! -d "$APP_SOURCE" ]; then
+  echo "Archive missing expected app bundle: $APP_SOURCE" >&2
+  exit 1
+fi
+
+mkdir -p "$EXPORT_DIR"
+cp -R "$APP_SOURCE" "$EXPORT_DIR/"
+
+mkdir -p "$STAGING_DIR"
+cp -R "$EXPORT_DIR/$APP_NAME" "$STAGING_DIR/"
+ln -s /Applications "$STAGING_DIR/Applications"
+
+echo "==> Building DMG"
+hdiutil create \
+  -volname "mvx" \
+  -srcfolder "$STAGING_DIR" \
+  -ov \
+  -format UDZO \
+  "$DMG_PATH" >/dev/null
+
+MANIFEST_PATH="$OUTPUT_DIR/release-manifest.json"
+DOWNLOAD_BASE_URL=${MVX_DOWNLOAD_BASE_URL:-https://downloads.example.com/mvx}
+APPCAST_URL=${MVX_APPCAST_URL:-$DOWNLOAD_BASE_URL/appcast.xml}
+
+cat > "$MANIFEST_PATH" <<EOF
+{
+  "version": "$VERSION",
+  "build": "$BUILD",
+  "bundleIdentifier": "dev.mvx.app",
+  "appBundleName": "$APP_NAME",
+  "dmgFileName": "$(basename "$DMG_PATH")",
+  "downloadURL": "$DOWNLOAD_BASE_URL/$(basename "$DMG_PATH")",
+  "appcastURL": "$APPCAST_URL",
+  "requiresNotarization": true,
+  "hardenedRuntimeEnabled": true
+}
+EOF
+
+echo "Release artifact ready:"
+echo "  Archive:  $ARCHIVE_PATH"
+echo "  App:      $EXPORT_DIR/$APP_NAME"
+echo "  DMG:      $DMG_PATH"
+echo "  Manifest: $MANIFEST_PATH"

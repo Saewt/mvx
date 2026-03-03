@@ -1,0 +1,33 @@
+#!/bin/sh
+set -eu
+
+ROOT_DIR=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
+VERSION=${MVX_RELEASE_VERSION:-0.1.0}
+OUTPUT_DIR=${MVX_OUTPUT_DIR:-"$ROOT_DIR/.build/release"}
+DMG_PATH=${MVX_DMG_PATH:-"$OUTPUT_DIR/mvx-$VERSION.dmg"}
+
+if [ ! -f "$DMG_PATH" ]; then
+  echo "DMG not found: $DMG_PATH" >&2
+  exit 1
+fi
+
+if [ -z "${MVX_NOTARY_PROFILE:-}" ]; then
+  echo "MVX_NOTARY_PROFILE is required (saved notarytool profile)." >&2
+  exit 1
+fi
+
+if [ -z "${MVX_TEAM_ID:-}" ]; then
+  echo "MVX_TEAM_ID is required." >&2
+  exit 1
+fi
+
+echo "==> Submitting $DMG_PATH for notarization"
+xcrun notarytool submit "$DMG_PATH" \
+  --keychain-profile "$MVX_NOTARY_PROFILE" \
+  --team-id "$MVX_TEAM_ID" \
+  --wait
+
+echo "==> Stapling notarization ticket"
+xcrun stapler staple "$DMG_PATH"
+
+echo "Notarized and stapled: $DMG_PATH"

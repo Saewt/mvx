@@ -1,0 +1,7 @@
+.planning/
+.build/
+.DS_Store
+analiz.md
+AGENTS.md
+docs/
+vendor/ghostty/GhosttyKit.xcframework/

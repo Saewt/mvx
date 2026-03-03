@@ -1,0 +1,22 @@
+#!/bin/sh
+
+if [ "$#" -lt 1 ]; then
+    echo "usage: mvx-wrap-agent <command> [args...]" >&2
+    exit 64
+fi
+
+SCRIPT_DIR=$(
+    CDPATH= cd -- "$(dirname -- "$0")" && pwd
+)
+
+"$SCRIPT_DIR/mvx-agent-status" running
+"$@"
+status=$?
+
+if [ "$status" -eq 0 ]; then
+    "$SCRIPT_DIR/mvx-agent-status" done
+else
+    "$SCRIPT_DIR/mvx-agent-status" error
+fi
+
+exit "$status"

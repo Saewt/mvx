@@ -1,0 +1,6 @@
+\u001B[38;2;17;34;51mtruecolor-sample\u001B[0m
+\u001B[48;2;60;70;80mbackground-sample\u001B[0m
+unicode: é café
+emoji: 👩‍💻 🧑🏽‍💻
+ligatures: -> => !=
+fallback: 漢字 glyphs

@@ -1,0 +1,81 @@
+#!/bin/sh
+set -eu
+
+ROOT_DIR=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
+VERSION=${MVX_RELEASE_VERSION:-0.1.0}
+BUILD=${MVX_BUILD_NUMBER:-1}
+OUTPUT_DIR=${MVX_OUTPUT_DIR:-"$ROOT_DIR/.build/release"}
+DOWNLOAD_BASE_URL=${MVX_DOWNLOAD_BASE_URL:-https://downloads.example.com/mvx}
+DMG_PATH=${MVX_DMG_PATH:-"$OUTPUT_DIR/mvx-$VERSION.dmg"}
+APPCAST_PATH=${MVX_APPCAST_PATH:-"$OUTPUT_DIR/appcast.xml"}
+CASK_PATH=${MVX_CASK_PATH:-"$ROOT_DIR/packaging/homebrew/Casks/mvx.rb"}
+HOMEPAGE_URL=${MVX_HOMEPAGE_URL:-https://github.com/emirekici/mvx}
+
+if [ ! -f "$DMG_PATH" ]; then
+  echo "DMG not found: $DMG_PATH" >&2
+  exit 1
+fi
+
+SHA256=$(shasum -a 256 "$DMG_PATH" | awk '{print $1}')
+DMG_NAME=$(basename "$DMG_PATH")
+APPCAST_URL=${MVX_APPCAST_URL:-$DOWNLOAD_BASE_URL/appcast.xml}
+PUB_DATE=$(LC_ALL=C date -u "+%a, %d %b %Y %H:%M:%S +0000")
+
+mkdir -p "$(dirname "$APPCAST_PATH")" "$(dirname "$CASK_PATH")"
+
+cat > "$APPCAST_PATH" <<EOF
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+  <channel>
+    <title>mvx Updates</title>
+    <link>$APPCAST_URL</link>
+    <description>Release feed for mvx direct distribution builds.</description>
+    <item>
+      <title>mvx $VERSION</title>
+      <pubDate>$PUB_DATE</pubDate>
+      <sparkle:version>$BUILD</sparkle:version>
+      <sparkle:shortVersionString>$VERSION</sparkle:shortVersionString>
+      <enclosure
+        url="$DOWNLOAD_BASE_URL/$DMG_NAME"
+        sparkle:version="$BUILD"
+        sparkle:shortVersionString="$VERSION"
+        sparkle:edSignature=""
+        length="0"
+        type="application/octet-stream" />
+    </item>
+  </channel>
+</rss>
+EOF
+
+cat > "$CASK_PATH" <<EOF
+cask "mvx" do
+  version "$VERSION"
+  sha256 "$SHA256"
+
+  url "$DOWNLOAD_BASE_URL/$DMG_NAME"
+  name "mvx"
+  desc "AI-agent-aware terminal workspace for macOS"
+  homepage "$HOMEPAGE_URL"
+
+  auto_updates true
+  depends_on macos: ">= :ventura"
+
+  app "mvx.app"
+end
+EOF
+
+cat > "$OUTPUT_DIR/release-publication.json" <<EOF
+{
+  "version": "$VERSION",
+  "build": "$BUILD",
+  "sha256": "$SHA256",
+  "downloadURL": "$DOWNLOAD_BASE_URL/$DMG_NAME",
+  "appcastURL": "$APPCAST_URL",
+  "homebrewCask": "$CASK_PATH"
+}
+EOF
+
+echo "Release publication assets updated:"
+echo "  Appcast: $APPCAST_PATH"
+echo "  Cask:    $CASK_PATH"
+echo "  SHA256:  $SHA256"

@@ -1,0 +1,17 @@
+#!/bin/sh
+
+if [ "$#" -ne 1 ]; then
+    echo "usage: mvx-agent-status <running|waiting|done|error>" >&2
+    exit 64
+fi
+
+case "$1" in
+    running|waiting|done|error)
+        ;;
+    *)
+        echo "invalid state: $1" >&2
+        exit 64
+        ;;
+esac
+
+printf '\033]7777;state=%s\007' "$1"

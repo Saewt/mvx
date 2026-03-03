@@ -1,0 +1,4 @@
+framework module GhosttyKit {
+  header "GhosttyKit-Swift.h"
+  requires objc
+}
