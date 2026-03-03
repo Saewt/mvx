@@ -121,13 +121,6 @@ public struct WorkspaceCommands: Commands {
 
     public var body: some Commands {
         CommandMenu("Workspace") {
-            Button("Check for Updates…") {
-                _ = commandHandler.perform(.checkForUpdates)
-            }
-            .disabled(commandHandler.updateController?.canCheckForUpdates != true)
-
-            Divider()
-
             Button("Command Palette") {
                 _ = commandHandler.perform(.commandPalette)
             }

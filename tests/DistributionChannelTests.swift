@@ -54,7 +54,7 @@ final class DistributionChannelTests: XCTestCase {
     }
 
     @MainActor
-    func testWorkspaceCommandHandlerSurfacesCheckForUpdatesWhenConfigured() {
+    func testWorkspaceCommandHandlerDoesNotSurfaceCheckForUpdates() {
         let workspace = makeTestWorkspace(autoStartSessions: false)
         let controller = ReleaseUpdateController(
             configuration: AppUpdateConfiguration(
@@ -64,9 +64,9 @@ final class DistributionChannelTests: XCTestCase {
         )
         let handler = WorkspaceCommandHandler(workspace: workspace, updateController: controller)
 
-        let descriptor = handler.availableCommands().first { $0.command == .checkForUpdates }
+        let commands = handler.availableCommands()
 
-        XCTAssertEqual(descriptor?.title, "Check for Updates")
-        XCTAssertEqual(descriptor?.isEnabled, true)
+        XCTAssertFalse(commands.contains { $0.command == .checkForUpdates })
+        XCTAssertFalse(commands.contains { $0.title == "Check for Updates" })
     }
 }

@@ -165,7 +165,6 @@ public final class WorkspaceCommandHandler: ObservableObject {
         let activeGroupSessionCount = workspace.sessions(inGroup: workspace.activeGroupID).count
 
         return [
-            WorkspaceCommandDescriptor(command: .checkForUpdates, title: "Check for Updates", keywords: ["sparkle", "release", "upgrade"], isEnabled: updateController?.canCheckForUpdates == true),
             WorkspaceCommandDescriptor(command: .commandPalette, title: "Command Palette", keywords: ["search", "actions"]),
             WorkspaceCommandDescriptor(command: .newWindow, title: "New Window", keywords: ["session", "create"]),
             WorkspaceCommandDescriptor(command: .newTab, title: "New Tab", keywords: ["session", "create"]),

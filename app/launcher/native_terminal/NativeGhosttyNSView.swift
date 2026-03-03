@@ -182,6 +182,12 @@ final class NativeGhosttyNSView: NSView {
             return false
         }
 
+        // Cmd+Q is a system-level app quit — never consume it in the terminal
+        if event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
+           event.charactersIgnoringModifiers == "q" {
+            return false
+        }
+
         if runtime?.sendKeyWithoutText(event: event) == true {
             return true
         }
