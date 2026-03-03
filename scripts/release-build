@@ -12,6 +12,58 @@ STAGING_DIR="$OUTPUT_DIR/mvx-$VERSION-release"
 DMG_PATH="$OUTPUT_DIR/mvx-$VERSION.dmg"
 APP_NAME=${MVX_APP_NAME:-mvx.app}
 ALLOW_UNSIGNED=${MVX_ALLOW_UNSIGNED:-1}
+DEVELOPER_ID_APPLICATION=${MVX_DEVELOPER_ID_APPLICATION:-}
+ARCHIVE_DESTINATION=${MVX_ARCHIVE_DESTINATION:-platform=macOS,arch=$(uname -m)}
+ARCHIVE_ARCHS=${MVX_ARCHIVE_ARCHS:-$(uname -m)}
+
+require_command() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    echo "Missing required command: $1" >&2
+    exit 1
+  fi
+}
+
+sign_path() {
+  PATH_TO_SIGN=$1
+
+  echo "==> Signing $(basename "$PATH_TO_SIGN")"
+  codesign \
+    --force \
+    --timestamp \
+    --options runtime \
+    --sign "$DEVELOPER_ID_APPLICATION" \
+    "$PATH_TO_SIGN"
+}
+
+sign_app_bundle() {
+  APP_BUNDLE=$1
+  FRAMEWORKS_DIR="$APP_BUNDLE/Contents/Frameworks"
+  PLUGINS_DIR="$APP_BUNDLE/Contents/PlugIns"
+
+  xattr -cr "$APP_BUNDLE"
+
+  if [ -d "$FRAMEWORKS_DIR" ]; then
+    find "$FRAMEWORKS_DIR" -type f \( -name "*.dylib" -o -name "*.so" \) -print | sort | while IFS= read -r nested_file; do
+      sign_path "$nested_file"
+    done
+
+    find "$FRAMEWORKS_DIR" -depth -type d \( -name "*.framework" -o -name "*.bundle" -o -name "*.xpc" -o -name "*.appex" -o -name "*.app" \) -print | sort | while IFS= read -r nested_bundle; do
+      sign_path "$nested_bundle"
+    done
+  fi
+
+  if [ -d "$PLUGINS_DIR" ]; then
+    find "$PLUGINS_DIR" -depth -type d \( -name "*.bundle" -o -name "*.xpc" -o -name "*.appex" -o -name "*.app" \) -print | sort | while IFS= read -r plugin_bundle; do
+      sign_path "$plugin_bundle"
+    done
+  fi
+
+  sign_path "$APP_BUNDLE"
+
+  echo "==> Verifying app signature"
+  codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE"
+  spctl -a -vv -t execute "$APP_BUNDLE"
+}
 
 mkdir -p "$OUTPUT_DIR"
 rm -rf "$ARCHIVE_PATH" "$EXPORT_DIR" "$STAGING_DIR"
@@ -19,29 +71,30 @@ rm -rf "$ARCHIVE_PATH" "$EXPORT_DIR" "$STAGING_DIR"
 ARCHIVE_ARGS=""
 if [ "$ALLOW_UNSIGNED" = "1" ]; then
   ARCHIVE_ARGS="CODE_SIGNING_ALLOWED=NO"
-fi
+else
+  require_command codesign
+  require_command spctl
+  require_command xattr
 
-EXPORT_OPTIONS="$OUTPUT_DIR/exportOptions.plist"
-cat > "$EXPORT_OPTIONS" <<EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>method</key>
-  <string>developer-id</string>
-  <key>signingStyle</key>
-  <string>manual</string>
-</dict>
-</plist>
-EOF
+  if [ -z "$DEVELOPER_ID_APPLICATION" ]; then
+    echo "MVX_DEVELOPER_ID_APPLICATION is required when MVX_ALLOW_UNSIGNED=0." >&2
+    exit 1
+  fi
+
+  # Keep archive output deterministic and apply Developer ID signing to the copied app bundle.
+  ARCHIVE_ARGS="CODE_SIGNING_ALLOWED=NO"
+fi
 
 echo "==> Archiving mvx"
 xcodebuild \
   -project "$ROOT_DIR/mvx.xcodeproj" \
   -scheme Mvx \
   -configuration Release \
+  -destination "$ARCHIVE_DESTINATION" \
   -derivedDataPath "$DERIVED_DATA" \
   -archivePath "$ARCHIVE_PATH" \
+  "ARCHS=$ARCHIVE_ARCHS" \
+  ONLY_ACTIVE_ARCH=YES \
   archive \
   $ARCHIVE_ARGS
 
@@ -54,6 +107,10 @@ fi
 mkdir -p "$EXPORT_DIR"
 cp -R "$APP_SOURCE" "$EXPORT_DIR/"
 
+if [ "$ALLOW_UNSIGNED" != "1" ]; then
+  sign_app_bundle "$EXPORT_DIR/$APP_NAME"
+fi
+
 mkdir -p "$STAGING_DIR"
 cp -R "$EXPORT_DIR/$APP_NAME" "$STAGING_DIR/"
 ln -s /Applications "$STAGING_DIR/Applications"
@@ -65,6 +122,15 @@ hdiutil create \
   -ov \
   -format UDZO \
   "$DMG_PATH" >/dev/null
+
+if [ "$ALLOW_UNSIGNED" != "1" ]; then
+  echo "==> Signing DMG"
+  sign_path "$DMG_PATH"
+
+  echo "==> Verifying DMG signature"
+  codesign --verify --verbose=2 "$DMG_PATH"
+  spctl -a -vv -t open "$DMG_PATH"
+fi
 
 MANIFEST_PATH="$OUTPUT_DIR/release-manifest.json"
 DOWNLOAD_BASE_URL=${MVX_DOWNLOAD_BASE_URL:-https://downloads.example.com/mvx}

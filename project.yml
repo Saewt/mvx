@@ -14,6 +14,7 @@ targets:
     sources:
       - path: app
         excludes:
+          - assets
           - diagnostics/fixtures
           - launcher
     settings:
@@ -25,6 +26,7 @@ targets:
     platform: macOS
     sources:
       - path: app/launcher
+      - path: app/assets/Assets.xcassets
       - path: vendor/ghostty/resources/ghostty
         type: folder
       - path: vendor/ghostty/resources/terminfo
@@ -50,6 +52,7 @@ targets:
         ENABLE_HARDENED_RUNTIME: YES
         INFOPLIST_KEY_MVXAppcastURL: https://downloads.example.com/mvx/appcast.xml
         INFOPLIST_KEY_MVXDownloadBaseURL: https://downloads.example.com/mvx
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
   MvxTests:
     type: bundle.unit-test
     platform: macOS

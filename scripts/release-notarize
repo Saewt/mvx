@@ -30,4 +30,8 @@ xcrun notarytool submit "$DMG_PATH" \
 echo "==> Stapling notarization ticket"
 xcrun stapler staple "$DMG_PATH"
 
+echo "==> Validating notarization ticket"
+xcrun stapler validate "$DMG_PATH"
+spctl -a -vv -t open "$DMG_PATH"
+
 echo "Notarized and stapled: $DMG_PATH"

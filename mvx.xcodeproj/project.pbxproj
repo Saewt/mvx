@@ -76,6 +76,7 @@
 		D2D8B3D590CFECEDECC5D666 /* TilingWorkspaceLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFAADA2F8669BF44B760E3FB /* TilingWorkspaceLayoutTests.swift */; };
 		D562AA2F4C2E2C766A56C6E4 /* ConfigStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F52862FBCF09D02A6532388 /* ConfigStore.swift */; };
 		DF1F87E3571B0487D3B7EA54 /* PaneDividerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D0A6248B005A473CED163AB /* PaneDividerView.swift */; };
+		DF4DAE4A1DD9C087A328B62F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 20A344D1CC2BA2B16B313621 /* Assets.xcassets */; };
 		E0E8B45EEAF9FE7C0602A069 /* ThemePreset.swift in Sources */ = {isa = PBXBuildFile; fileRef = 374BBC61DAA69A43C7867632 /* ThemePreset.swift */; };
 		E8C98B4C06C3956B21C95B1E /* GhosttyKit.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 21DAD4974C8D68F8316D4011 /* GhosttyKit.xcframework */; };
 		EA5237A5A9AF708A16734D29 /* RenderBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0C5BEDCED6DA07D0020BEA0 /* RenderBridge.swift */; };
@@ -137,6 +138,7 @@
 		19961297C89A03F026C77242 /* ghostty */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ghostty; path = vendor/ghostty/resources/ghostty; sourceTree = SOURCE_ROOT; };
 		1EA048007D0D8EDA21FD6B60 /* SessionSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionSidebarView.swift; sourceTree = "<group>"; };
 		201191FA321D056C9EDC3765 /* TerminalProbeRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalProbeRunner.swift; sourceTree = "<group>"; };
+		20A344D1CC2BA2B16B313621 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		21DAD4974C8D68F8316D4011 /* GhosttyKit.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = GhosttyKit.xcframework; path = vendor/ghostty/GhosttyKit.xcframework; sourceTree = "<group>"; };
 		22D0E89258CAD43D3F386B24 /* SessionAgentStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionAgentStatus.swift; sourceTree = "<group>"; };
 		236BEF60321496E23132387C /* MvxLauncher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MvxLauncher.swift; sourceTree = "<group>"; };
@@ -357,6 +359,15 @@
 			path = app/launcher;
 			sourceTree = "<group>";
 		};
+		97EF77A89FD048B85E179C3B /* assets */ = {
+			isa = PBXGroup;
+			children = (
+				20A344D1CC2BA2B16B313621 /* Assets.xcassets */,
+			);
+			name = assets;
+			path = app/assets;
+			sourceTree = "<group>";
+		};
 		9F5A8420E3720B01B5829540 /* distribution */ = {
 			isa = PBXGroup;
 			children = (
@@ -397,6 +408,7 @@
 				E20A610BE5814C138120B47E /* shell-integration */,
 				423EB637C483155CC8235E4C /* terminfo */,
 				785BF872C2C1166812B4AE29 /* app */,
+				97EF77A89FD048B85E179C3B /* assets */,
 				978C3E82786B163F2891795A /* launcher */,
 				946E26EC1CA8B94DD110628D /* tests */,
 				60319DCED3A5084CECE4FB56 /* Frameworks */,
@@ -525,6 +537,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				DF4DAE4A1DD9C087A328B62F /* Assets.xcassets in Resources */,
 				B81AFA0A17141B0F331F91A4 /* ghostty in Resources */,
 				085C25B8A6C7D60D9BFECA2A /* shell-integration in Resources */,
 				C98D04BE29C48541C33A29C0 /* terminfo in Resources */,
