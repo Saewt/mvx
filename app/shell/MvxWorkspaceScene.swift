@@ -64,6 +64,7 @@ public struct MvxWorkspaceScene: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Show Sidebar")
+        .help("Show Sidebar")
         .background(Color(red: 0.10, green: 0.10, blue: 0.09))
         .overlay(alignment: .trailing) {
             Divider()
@@ -96,7 +97,7 @@ public struct MvxWorkspaceScene: View {
                     Button {
                         _ = commandHandler.perform(cmd.command)
                     } label: {
-                        Image(systemName: paneSymbol(for: cmd.command))
+                        Image(systemName: cmd.command.symbolName)
                             .font(.system(size: 11, weight: .semibold))
                             .frame(width: 24, height: 24)
                             .background(
@@ -112,17 +113,6 @@ public struct MvxWorkspaceScene: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
         .background(Color(red: 0.10, green: 0.10, blue: 0.09))
-    }
-
-    private func paneSymbol(for command: WorkspaceCommand) -> String {
-        switch command {
-        case .splitHorizontal: return "rectangle.split.2x1"
-        case .splitVertical: return "rectangle.split.1x2"
-        case .closePane: return "rectangle.portrait.and.arrow.right"
-        case .nextPane: return "rectangle.on.rectangle.angled"
-        case .previousPane: return "rectangle.on.rectangle.angled.fill"
-        default: return "square"
-        }
     }
 
     private func toggleSidebarCollapsed() {

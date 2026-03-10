@@ -6,19 +6,22 @@ public struct SessionGroup: Identifiable, Codable, Equatable, Hashable {
     public var colorTag: SessionGroupColor?
     public var isCollapsed: Bool
     public var paneGraph: WorkspaceGraph
+    public var note: WorkspaceNoteSnapshot?
 
     public init(
         id: UUID = UUID(),
         name: String,
         colorTag: SessionGroupColor? = nil,
         isCollapsed: Bool = false,
-        paneGraph: WorkspaceGraph = WorkspaceGraph()
+        paneGraph: WorkspaceGraph = WorkspaceGraph(),
+        note: WorkspaceNoteSnapshot? = nil
     ) {
         self.id = id
         self.name = name
         self.colorTag = colorTag
         self.isCollapsed = isCollapsed
         self.paneGraph = paneGraph
+        self.note = note
     }
 }
 

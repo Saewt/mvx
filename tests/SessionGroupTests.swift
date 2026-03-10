@@ -14,10 +14,12 @@ final class SessionGroupTests: XCTestCase {
         XCTAssertFalse(first.isCollapsed)
         XCTAssertNil(first.paneGraph.rootPane)
         XCTAssertNil(first.paneGraph.focusedPaneID)
+        XCTAssertNil(first.note)
         XCTAssertEqual(second.name, "New Group 2")
         XCTAssertEqual(second.colorTag, .blue)
         XCTAssertNil(second.paneGraph.rootPane)
         XCTAssertNil(second.paneGraph.focusedPaneID)
+        XCTAssertNil(second.note)
         XCTAssertEqual(workspace.sessionGroups.map(\.id), [first.id, second.id])
     }
 

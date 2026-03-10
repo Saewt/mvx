@@ -45,7 +45,30 @@ public struct WorkspaceSidebarVisibilityState: Equatable {
 }
 
 public struct SessionRailChromeState: Equatable {
-    public let topActionSymbols: [String]
+    public struct TopAction: Equatable, Identifiable {
+        public let command: WorkspaceCommand
+        public let symbolName: String
+        public let tooltip: String
+        public let isEnabled: Bool
+
+        public var id: WorkspaceCommand {
+            command
+        }
+
+        public init(
+            command: WorkspaceCommand,
+            symbolName: String,
+            tooltip: String,
+            isEnabled: Bool
+        ) {
+            self.command = command
+            self.symbolName = symbolName
+            self.tooltip = tooltip
+            self.isEnabled = isEnabled
+        }
+    }
+
+    public let topActions: [TopAction]
     public let sessionCount: Int
     public let activeSessionTitle: String?
     public let attentionCount: Int
@@ -53,7 +76,26 @@ public struct SessionRailChromeState: Equatable {
     @MainActor
     public static func resolve(workspace: SessionWorkspace) -> SessionRailChromeState {
         SessionRailChromeState(
-            topActionSymbols: ["square.grid.2x2", "bell", "plus"],
+            topActions: [
+                TopAction(
+                    command: .commandPalette,
+                    symbolName: WorkspaceCommand.commandPalette.symbolName,
+                    tooltip: WorkspaceCommand.commandPalette.title,
+                    isEnabled: true
+                ),
+                TopAction(
+                    command: .nextAttention,
+                    symbolName: WorkspaceCommand.nextAttention.symbolName,
+                    tooltip: WorkspaceCommand.nextAttention.title,
+                    isEnabled: workspace.nextAttentionSessionID() != nil
+                ),
+                TopAction(
+                    command: .newTab,
+                    symbolName: WorkspaceCommand.newTab.symbolName,
+                    tooltip: WorkspaceCommand.newTab.title,
+                    isEnabled: true
+                ),
+            ],
             sessionCount: workspace.sessions.count,
             activeSessionTitle: workspace.activeDescriptor?.displayTitle,
             attentionCount: workspace.sessions.filter { $0.agentStatus.needsAttention }.count

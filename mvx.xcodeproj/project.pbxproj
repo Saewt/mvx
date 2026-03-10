@@ -22,11 +22,14 @@
 		2D5BA78CED0E8735A3ECB914 /* TerminalTextFidelityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0E438D0EC390F0498CA7255 /* TerminalTextFidelityTests.swift */; };
 		2E158D58602662341F58A497 /* SessionGroupPaneGraphTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FB387596A1EF857C78469CB /* SessionGroupPaneGraphTests.swift */; };
 		2F2837224FF9166C2C3DE57B /* SessionTabRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B51C44A340166C763E804750 /* SessionTabRowView.swift */; };
+		32E73A4DF1ABF18C995D01F0 /* WorkspaceNotesCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D713662FECB4E3A3C0CAEF4 /* WorkspaceNotesCardView.swift */; };
+		3603CAB40F811DB59860CB5E /* WorkspaceAutosaveControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EE746688CB2AFFB9DD1F76D /* WorkspaceAutosaveControllerTests.swift */; };
 		373C7B2CA2B2A939DF0B1237 /* WorkspaceShellScaffold.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2878E56EF252F425A8507A33 /* WorkspaceShellScaffold.swift */; };
 		3A18F5CB4AE45EA2D94BFD0E /* WorkspaceShellLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8293C73F15D27A10AF973F70 /* WorkspaceShellLayoutTests.swift */; };
 		3CD692FBBC152963B3A0DE60 /* SessionCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E13C8D72C94FD521EDC9AC0 /* SessionCommand.swift */; };
 		3FEC04FB063D425529A512B8 /* Mvx.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = C589C5A2891CD58E9FD7D9B9 /* Mvx.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		3FFB96F55ECB8EA7FAE43AD0 /* SessionGroupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC8CEA1C458E295E189AE608 /* SessionGroupTests.swift */; };
+		4093CE6B500518CD3AF6D83E /* WorkspaceNote.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC958A6ED1EC97D52C5DE773 /* WorkspaceNote.swift */; };
 		40B98CA15D3A5A7E809CED77 /* GhosttyAppRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8175F3DD39DA5C080D363AA2 /* GhosttyAppRuntime.swift */; };
 		41AAEA1D1515629BC5502F96 /* ClipboardBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB62DBEB1A8A2FC690520A1C /* ClipboardBridge.swift */; };
 		45F35EC88F4939F281372E9C /* TerminalLinkParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = B97DBE092DAC6EC444490488 /* TerminalLinkParser.swift */; };
@@ -46,9 +49,11 @@
 		6EC1C8A05230A4F744754831 /* WorkspacePanePersistenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 361CE7528E1D603C273024C9 /* WorkspacePanePersistenceTests.swift */; };
 		6EE44BCA95625F4AA785CB82 /* Carbon.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 53C294E3846E6575CEDCF2AE /* Carbon.framework */; };
 		714B71981E2F28E755E0AFFC /* SessionWorkspacePersistenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 283EAC52154BA44EF407A583 /* SessionWorkspacePersistenceTests.swift */; };
+		75ED46B054D2A430A8EE8A40 /* WorkspaceNotesCardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDCDFF0D2C519CC93D668F48 /* WorkspaceNotesCardTests.swift */; };
 		7F5056F7B61CA2E19A93B6CE /* SessionGroupHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93D7CB31B7AB94311E5AC31B /* SessionGroupHeaderView.swift */; };
 		809B992DA718BF568B723FA9 /* TerminalProbeRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 201191FA321D056C9EDC3765 /* TerminalProbeRunner.swift */; };
 		810E120F6C78A035B6833201 /* MvxLauncher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 236BEF60321496E23132387C /* MvxLauncher.swift */; };
+		8920B37E8E62EDECE245D87F /* WorkspaceAutosaveController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17A70F395624411CD87DC5FF /* WorkspaceAutosaveController.swift */; };
 		8E6ED5CE472C1107E28D3932 /* TilingWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E918FC115E4AC9EFA74C6FF0 /* TilingWorkspaceView.swift */; };
 		90E8457D436A56E2DA990FD8 /* AppPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77C3E736F3E59E55D5EDCF5D /* AppPreferences.swift */; };
 		91333891763CE926DA173367 /* MvxWorkspaceScene.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36A77AA876E33611B06FBB19 /* MvxWorkspaceScene.swift */; };
@@ -135,6 +140,7 @@
 		0FFA3E253D2E2D7412FCF39C /* WorkspaceCommandHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceCommandHandler.swift; sourceTree = "<group>"; };
 		10CBFF5A0A30E50DF0D936FC /* ReleasePackaging.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReleasePackaging.swift; sourceTree = "<group>"; };
 		12D8E55435E392F0D061E35D /* GhosttySupportPaths.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhosttySupportPaths.swift; sourceTree = "<group>"; };
+		17A70F395624411CD87DC5FF /* WorkspaceAutosaveController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceAutosaveController.swift; sourceTree = "<group>"; };
 		19961297C89A03F026C77242 /* ghostty */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ghostty; path = vendor/ghostty/resources/ghostty; sourceTree = SOURCE_ROOT; };
 		1EA048007D0D8EDA21FD6B60 /* SessionSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionSidebarView.swift; sourceTree = "<group>"; };
 		201191FA321D056C9EDC3765 /* TerminalProbeRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalProbeRunner.swift; sourceTree = "<group>"; };
@@ -146,6 +152,7 @@
 		283EAC52154BA44EF407A583 /* SessionWorkspacePersistenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionWorkspacePersistenceTests.swift; sourceTree = "<group>"; };
 		2878E56EF252F425A8507A33 /* WorkspaceShellScaffold.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceShellScaffold.swift; sourceTree = "<group>"; };
 		2DFD04FE63DF560AD0ECAF87 /* CommandPaletteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandPaletteView.swift; sourceTree = "<group>"; };
+		2EE746688CB2AFFB9DD1F76D /* WorkspaceAutosaveControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceAutosaveControllerTests.swift; sourceTree = "<group>"; };
 		2F52862FBCF09D02A6532388 /* ConfigStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigStore.swift; sourceTree = "<group>"; };
 		30C2F2FEB4552DE021B34513 /* TerminalHostFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalHostFactory.swift; sourceTree = "<group>"; };
 		33F74165411C8EA399E02408 /* SessionDescriptor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionDescriptor.swift; sourceTree = "<group>"; };
@@ -174,8 +181,10 @@
 		8D0A6248B005A473CED163AB /* PaneDividerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaneDividerView.swift; sourceTree = "<group>"; };
 		8D0B0D8603D0503210786DB8 /* WorkspaceModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceModelTests.swift; sourceTree = "<group>"; };
 		93D7CB31B7AB94311E5AC31B /* SessionGroupHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionGroupHeaderView.swift; sourceTree = "<group>"; };
+		9D713662FECB4E3A3C0CAEF4 /* WorkspaceNotesCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceNotesCardView.swift; sourceTree = "<group>"; };
 		A37A5B7F457B13C64C286E1F /* AppDirectories.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDirectories.swift; sourceTree = "<group>"; };
 		AC8CEA1C458E295E189AE608 /* SessionGroupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionGroupTests.swift; sourceTree = "<group>"; };
+		AC958A6ED1EC97D52C5DE773 /* WorkspaceNote.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceNote.swift; sourceTree = "<group>"; };
 		B2DEE5F608D9D0FC6FC8EF48 /* TerminalSessionDriver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalSessionDriver.swift; sourceTree = "<group>"; };
 		B3164A2630FDF0E7C29A6866 /* WorkspaceMetadata.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceMetadata.swift; sourceTree = "<group>"; };
 		B42AC14BE82D0E36810CFE77 /* MvxMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MvxMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -190,6 +199,7 @@
 		C4C96A594EE767A04BBA86DF /* NativeGhosttyNSView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeGhosttyNSView.swift; sourceTree = "<group>"; };
 		C589C5A2891CD58E9FD7D9B9 /* Mvx.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Mvx.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		CB62DBEB1A8A2FC690520A1C /* ClipboardBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardBridge.swift; sourceTree = "<group>"; };
+		CDCDFF0D2C519CC93D668F48 /* WorkspaceNotesCardTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceNotesCardTests.swift; sourceTree = "<group>"; };
 		D0E438D0EC390F0498CA7255 /* TerminalTextFidelityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalTextFidelityTests.swift; sourceTree = "<group>"; };
 		D0F6FA49D5C6601EB344156B /* NativeGhosttyTerminalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeGhosttyTerminalView.swift; sourceTree = "<group>"; };
 		D55BDB18A2B53EF8AF70128E /* TerminalSessionSmokeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalSessionSmokeTests.swift; sourceTree = "<group>"; };
@@ -253,6 +263,7 @@
 				B51C44A340166C763E804750 /* SessionTabRowView.swift */,
 				30C2F2FEB4552DE021B34513 /* TerminalHostFactory.swift */,
 				E918FC115E4AC9EFA74C6FF0 /* TilingWorkspaceView.swift */,
+				9D713662FECB4E3A3C0CAEF4 /* WorkspaceNotesCardView.swift */,
 				2878E56EF252F425A8507A33 /* WorkspaceShellScaffold.swift */,
 			);
 			path = ui;
@@ -311,8 +322,10 @@
 				D0E438D0EC390F0498CA7255 /* TerminalTextFidelityTests.swift */,
 				EFAADA2F8669BF44B760E3FB /* TilingWorkspaceLayoutTests.swift */,
 				BA2ED6364935BD8A0919354E /* WorkflowChromeTests.swift */,
+				2EE746688CB2AFFB9DD1F76D /* WorkspaceAutosaveControllerTests.swift */,
 				E30F685A2BC2D34E6F75B6FE /* WorkspaceCommandHandlerTests.swift */,
 				8D0B0D8603D0503210786DB8 /* WorkspaceModelTests.swift */,
+				CDCDFF0D2C519CC93D668F48 /* WorkspaceNotesCardTests.swift */,
 				361CE7528E1D603C273024C9 /* WorkspacePanePersistenceTests.swift */,
 				8293C73F15D27A10AF973F70 /* WorkspaceShellLayoutTests.swift */,
 				B3CB90B0CF2669F63A3A7828 /* Support */,
@@ -340,8 +353,10 @@
 				FCF1322C7F3D2D011E7B3A44 /* SessionGroup.swift */,
 				DC208708E09B04039BCD9CB1 /* SessionNaming.swift */,
 				F520565A87DC0E9515CD449F /* SessionWorkspace.swift */,
+				17A70F395624411CD87DC5FF /* WorkspaceAutosaveController.swift */,
 				C270F35603EAA96E0017B89D /* WorkspaceGraph.swift */,
 				B3164A2630FDF0E7C29A6866 /* WorkspaceMetadata.swift */,
+				AC958A6ED1EC97D52C5DE773 /* WorkspaceNote.swift */,
 				45AA20AE4A59C6C9C785E16A /* WorkspacePersistence.swift */,
 				3E19F24CBC5E660D8A5A6E34 /* WorkspaceRegistry.swift */,
 				B5D96A7DBB03437C9769E766 /* WorkspaceSnapshot.swift */,
@@ -569,8 +584,10 @@
 				2D5BA78CED0E8735A3ECB914 /* TerminalTextFidelityTests.swift in Sources */,
 				D2D8B3D590CFECEDECC5D666 /* TilingWorkspaceLayoutTests.swift in Sources */,
 				0D31BA4DF39AF6B5F3045333 /* WorkflowChromeTests.swift in Sources */,
+				3603CAB40F811DB59860CB5E /* WorkspaceAutosaveControllerTests.swift in Sources */,
 				BB3A6AA0E2047A0AB8D2113B /* WorkspaceCommandHandlerTests.swift in Sources */,
 				46D592A7A7E1C1653BFC9BB7 /* WorkspaceModelTests.swift in Sources */,
+				75ED46B054D2A430A8EE8A40 /* WorkspaceNotesCardTests.swift in Sources */,
 				6EC1C8A05230A4F744754831 /* WorkspacePanePersistenceTests.swift in Sources */,
 				3A18F5CB4AE45EA2D94BFD0E /* WorkspaceShellLayoutTests.swift in Sources */,
 			);
@@ -627,9 +644,12 @@
 				BF345203A3CFD887101C452C /* TerminalSessionDriver.swift in Sources */,
 				E0E8B45EEAF9FE7C0602A069 /* ThemePreset.swift in Sources */,
 				8E6ED5CE472C1107E28D3932 /* TilingWorkspaceView.swift in Sources */,
+				8920B37E8E62EDECE245D87F /* WorkspaceAutosaveController.swift in Sources */,
 				920141DA5454F2A8C6F47B09 /* WorkspaceCommandHandler.swift in Sources */,
 				6C6533D58012F7DA61B7B035 /* WorkspaceGraph.swift in Sources */,
 				CC4032DA7F3E66816D9BB9A8 /* WorkspaceMetadata.swift in Sources */,
+				4093CE6B500518CD3AF6D83E /* WorkspaceNote.swift in Sources */,
+				32E73A4DF1ABF18C995D01F0 /* WorkspaceNotesCardView.swift in Sources */,
 				C50A59609F7C7B52A6E98069 /* WorkspacePersistence.swift in Sources */,
 				6AF43DA4BA259FAF3933F804 /* WorkspaceRegistry.swift in Sources */,
 				373C7B2CA2B2A939DF0B1237 /* WorkspaceShellScaffold.swift in Sources */,

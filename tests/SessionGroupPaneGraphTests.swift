@@ -182,6 +182,7 @@ final class SessionGroupPaneGraphTests: XCTestCase {
         XCTAssertNil(restored.activeGroupID)
         XCTAssertNil(restored.workspaceGraph.rootPane)
         XCTAssertEqual(restored.sessionGroups.count, 1)
+        XCTAssertNil(restored.sessionGroups[0].note)
         XCTAssertEqual(restored.sessionGroups[0].paneGraph.leafSessionIDs, [sessionID])
     }
 

@@ -58,6 +58,40 @@ public struct SessionTabRowVisualState: Equatable {
     }
 }
 
+struct SessionTabDurationState: Equatable {
+    let label: String?
+
+    static func resolve(
+        startedAt: Date?,
+        isRenaming: Bool,
+        referenceDate: Date
+    ) -> SessionTabDurationState {
+        guard !isRenaming, let startedAt else {
+            return SessionTabDurationState(label: nil)
+        }
+
+        return SessionTabDurationState(
+            label: formattedLabel(startedAt: startedAt, referenceDate: referenceDate)
+        )
+    }
+
+    static func formattedLabel(startedAt: Date, referenceDate: Date) -> String {
+        let elapsedSeconds = max(referenceDate.timeIntervalSince(startedAt), 0)
+        let elapsedMinutes = Int(elapsedSeconds / 60)
+
+        if elapsedMinutes < 60 {
+            return "\(elapsedMinutes)m"
+        }
+
+        let elapsedHours = elapsedMinutes / 60
+        if elapsedHours < 24 {
+            return "\(elapsedHours)h"
+        }
+
+        return "\(elapsedHours / 24)d"
+    }
+}
+
 public enum SessionTabRenameSelectionBehavior: Equatable {
     case selectAll
     case placeCaretAtEnd
@@ -323,10 +357,29 @@ public struct SessionTabRowView: View {
                     onCancel: cancelRename
                 )
             } else {
-                Text(descriptor.displayTitle)
-                    .font(.system(.body, design: .monospaced))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
+                HStack(spacing: 6) {
+                    Text(descriptor.displayTitle)
+                        .font(.system(.body, design: .monospaced))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+
+                    if let sessionStartedAt = workspace.sessionStartedAt(for: descriptor.id) {
+                        TimelineView(.periodic(from: sessionStartedAt, by: 60)) { context in
+                            let durationState = SessionTabDurationState.resolve(
+                                startedAt: sessionStartedAt,
+                                isRenaming: renameController.isRenaming,
+                                referenceDate: context.date
+                            )
+
+                            if let label = durationState.label {
+                                Text(label)
+                                    .font(.system(.caption2, design: .monospaced).weight(.medium))
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: true, vertical: false)
+                            }
+                        }
+                    }
+                }
             }
 
             Spacer(minLength: 0)

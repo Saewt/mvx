@@ -36,6 +36,24 @@ final class SessionWorkspaceTests: XCTestCase {
         XCTAssertNil(workspace.session(for: firstID))
     }
 
+    func testCreateSessionTracksStartedAtDate() throws {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+        let firstID = try XCTUnwrap(workspace.activeSessionID)
+        let second = workspace.createSession(selectNewSession: false)
+
+        XCTAssertNotNil(workspace.sessionStartedAt(for: firstID))
+        XCTAssertNotNil(workspace.sessionStartedAt(for: second.id))
+    }
+
+    func testCloseSessionRemovesTrackedStartedAtDate() throws {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+        let second = workspace.createSession(selectNewSession: false)
+
+        XCTAssertNotNil(workspace.sessionStartedAt(for: second.id))
+        XCTAssertTrue(workspace.closeSession(id: second.id))
+        XCTAssertNil(workspace.sessionStartedAt(for: second.id))
+    }
+
     func testClosingLastSessionCreatesReplacement() throws {
         let workspace = makeTestWorkspace(autoStartSessions: false)
         let firstID = try XCTUnwrap(workspace.activeSessionID)
@@ -199,6 +217,68 @@ final class SessionWorkspaceTests: XCTestCase {
         XCTAssertEqual(workspace.sessionID(forPane: firstPaneID), firstID)
     }
 
+    func testSessionCommandAdaptiveVerticalSplitBuildsTopTwoBottomOneLayout() throws {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+
+        XCTAssertTrue(workspace.perform(.splitHorizontal))
+        XCTAssertTrue(workspace.perform(.splitVertical))
+
+        let rootPane = try XCTUnwrap(workspace.workspaceGraph.rootPane)
+
+        XCTAssertEqual(workspace.workspaceGraph.paneCount, 3)
+        XCTAssertEqual(rootPane.axis, .horizontal)
+        XCTAssertEqual(rootPane.children.count, 2)
+        XCTAssertEqual(rootPane.children[0].axis, .vertical)
+        XCTAssertEqual(rootPane.children[0].children.count, 2)
+        XCTAssertTrue(rootPane.children[0].children.allSatisfy(\.isLeaf))
+        XCTAssertTrue(rootPane.children[1].isLeaf)
+    }
+
+    func testSplitActivePaneStillUsesFocusedPaneAfterHorizontalSplit() throws {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+
+        XCTAssertTrue(workspace.perform(.splitHorizontal))
+        let focusedBottomPaneID = try XCTUnwrap(workspace.focusedPaneID)
+
+        XCTAssertTrue(workspace.splitActivePane(.vertical))
+
+        let rootPane = try XCTUnwrap(workspace.workspaceGraph.rootPane)
+
+        XCTAssertEqual(workspace.workspaceGraph.paneCount, 3)
+        XCTAssertEqual(rootPane.axis, .horizontal)
+        XCTAssertTrue(rootPane.children[0].isLeaf)
+        XCTAssertEqual(rootPane.children[1].axis, .vertical)
+        XCTAssertEqual(rootPane.children[1].children.count, 2)
+        XCTAssertEqual(rootPane.children[1].children[0].id, focusedBottomPaneID)
+        XCTAssertTrue(rootPane.children[1].children.allSatisfy(\.isLeaf))
+    }
+
+    func testSessionCommandAdaptiveVerticalSplitFallsBackAfterTwoByTwoLayout() throws {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+
+        XCTAssertTrue(workspace.perform(.splitHorizontal))
+        XCTAssertTrue(workspace.perform(.splitVertical))
+        XCTAssertTrue(workspace.perform(.splitVertical))
+        let focusedPaneID = try XCTUnwrap(workspace.focusedPaneID)
+
+        XCTAssertTrue(workspace.perform(.splitVertical))
+
+        let rootPane = try XCTUnwrap(workspace.workspaceGraph.rootPane)
+        let bottomBranch = rootPane.children[1]
+        let nestedBranch = bottomBranch.children[1]
+
+        XCTAssertEqual(workspace.workspaceGraph.paneCount, 5)
+        XCTAssertEqual(rootPane.axis, .horizontal)
+        XCTAssertEqual(rootPane.children.count, 2)
+        XCTAssertEqual(rootPane.children[0].axis, .vertical)
+        XCTAssertEqual(bottomBranch.axis, .vertical)
+        XCTAssertEqual(bottomBranch.children.count, 2)
+        XCTAssertEqual(nestedBranch.axis, .vertical)
+        XCTAssertEqual(nestedBranch.children.count, 2)
+        XCTAssertEqual(nestedBranch.children[0].id, focusedPaneID)
+        XCTAssertTrue(nestedBranch.children.allSatisfy(\.isLeaf))
+    }
+
     func testUpdateSessionContextPublishesSingleChange() throws {
         let workspace = makeTestWorkspace(autoStartSessions: false)
         let sessionID = try XCTUnwrap(workspace.activeSessionID)
@@ -231,6 +311,20 @@ final class SessionWorkspaceTests: XCTestCase {
 
         XCTAssertEqual(publishCount, 1)
         _ = cancellable
+    }
+
+    func testRestoreResetsTrackedStartedAtDates() throws {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+        let sessionID = try XCTUnwrap(workspace.activeSessionID)
+        let initialStartedAt = try XCTUnwrap(workspace.sessionStartedAt(for: sessionID))
+        let snapshot = workspace.snapshot()
+
+        Thread.sleep(forTimeInterval: 0.01)
+
+        XCTAssertTrue(workspace.restore(from: snapshot))
+
+        let restoredStartedAt = try XCTUnwrap(workspace.sessionStartedAt(for: sessionID))
+        XCTAssertGreaterThan(restoredStartedAt, initialStartedAt)
     }
 
     func testRefreshVisibleStateCoalescesMultipleRequestsPerRunLoop() {
@@ -269,5 +363,100 @@ final class SessionWorkspaceTests: XCTestCase {
 
         XCTAssertEqual(publishCount, 1)
         _ = cancellable
+    }
+
+    // MARK: - Adaptive Drop Placement
+
+    func testAdaptivelyPlaceSessionCreatesHorizontalSplitFromSinglePane() throws {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+        let firstID = try XCTUnwrap(workspace.activeSessionID)
+        let detached = workspace.createSession(selectNewSession: false)
+        let targetPaneID = try XCTUnwrap(workspace.paneID(for: firstID))
+
+        XCTAssertTrue(
+            workspace.performPaneDrop(
+                payload: WorkspaceDragPayload(kind: .session, id: detached.id),
+                targetPaneID: targetPaneID,
+                zone: .splitRight
+            )
+        )
+
+        XCTAssertEqual(workspace.workspaceGraph.paneCount, 2)
+        let root = try XCTUnwrap(workspace.workspaceGraph.rootPane)
+        XCTAssertEqual(root.axis, .horizontal)
+    }
+
+    func testAdaptivelyPlaceSessionSplitsTopPaneAtTwoPanes() throws {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+        let firstID = try XCTUnwrap(workspace.activeSessionID)
+        XCTAssertTrue(workspace.splitActivePane(.horizontal))
+        XCTAssertEqual(workspace.workspaceGraph.paneCount, 2)
+
+        let detached = workspace.createSession(selectNewSession: false)
+        let targetPaneID = try XCTUnwrap(workspace.paneID(for: firstID))
+
+        XCTAssertTrue(
+            workspace.performPaneDrop(
+                payload: WorkspaceDragPayload(kind: .session, id: detached.id),
+                targetPaneID: targetPaneID,
+                zone: .splitRight
+            )
+        )
+
+        XCTAssertEqual(workspace.workspaceGraph.paneCount, 3)
+        let root = try XCTUnwrap(workspace.workspaceGraph.rootPane)
+        XCTAssertEqual(root.axis, .horizontal)
+        XCTAssertEqual(root.children[0].axis, .vertical)
+        XCTAssertTrue(root.children[1].isLeaf)
+    }
+
+    func testAdaptivelyPlaceSessionCreates2x2AtThreePanes() throws {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+        let firstID = try XCTUnwrap(workspace.activeSessionID)
+        XCTAssertTrue(workspace.splitActivePane(.horizontal))
+        // Focus back to first session (top pane) and split vertically
+        XCTAssertTrue(workspace.selectSession(id: firstID))
+        XCTAssertTrue(workspace.splitActivePane(.vertical))
+        XCTAssertEqual(workspace.workspaceGraph.paneCount, 3)
+
+        let detached = workspace.createSession(selectNewSession: false)
+        let bottomPaneID = try XCTUnwrap(workspace.workspaceGraph.rootPane?.children[1].id)
+
+        XCTAssertTrue(
+            workspace.performPaneDrop(
+                payload: WorkspaceDragPayload(kind: .session, id: detached.id),
+                targetPaneID: bottomPaneID,
+                zone: .splitRight
+            )
+        )
+
+        XCTAssertEqual(workspace.workspaceGraph.paneCount, 4)
+        let root = try XCTUnwrap(workspace.workspaceGraph.rootPane)
+        XCTAssertEqual(root.axis, .horizontal)
+        XCTAssertEqual(root.children[0].axis, .vertical)
+        XCTAssertEqual(root.children[1].axis, .vertical)
+    }
+
+    func testAdaptivelyPlaceSessionReturnsFalseAtFourPlusPanes() throws {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+        XCTAssertTrue(workspace.performAdaptiveSplit(.horizontal))
+        XCTAssertTrue(workspace.performAdaptiveSplit(.vertical))
+        XCTAssertTrue(workspace.performAdaptiveSplit(.vertical))
+        XCTAssertEqual(workspace.workspaceGraph.paneCount, 4)
+
+        let detached = workspace.createSession(selectNewSession: false)
+        let leafPanes = workspace.workspaceGraph.leafPanes
+        let targetPaneID = try XCTUnwrap(leafPanes.first?.id)
+
+        // Adaptive placement should not apply — falls back to explicit drop zone
+        XCTAssertTrue(
+            workspace.performPaneDrop(
+                payload: WorkspaceDragPayload(kind: .session, id: detached.id),
+                targetPaneID: targetPaneID,
+                zone: .splitBottom
+            )
+        )
+
+        XCTAssertEqual(workspace.workspaceGraph.paneCount, 5)
     }
 }

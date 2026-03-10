@@ -80,7 +80,7 @@ public struct ActiveWorkContextState: Equatable {
             WorkflowQuickActionState(
                 command: descriptor.command,
                 title: descriptor.title,
-                symbolName: symbolName(for: descriptor.command),
+                symbolName: descriptor.command.symbolName,
                 isEnabled: descriptor.isEnabled
             )
         }
@@ -89,7 +89,7 @@ public struct ActiveWorkContextState: Equatable {
             WorkflowQuickActionState(
                 command: descriptor.command,
                 title: descriptor.title,
-                symbolName: symbolName(for: descriptor.command),
+                symbolName: descriptor.command.symbolName,
                 isEnabled: descriptor.isEnabled
             )
         }
@@ -105,45 +105,6 @@ public struct ActiveWorkContextState: Equatable {
             paneActions: paneActions,
             workspaceSummary: workspaceSummary
         )
-    }
-
-    private static func symbolName(for command: WorkspaceCommand) -> String {
-        switch command {
-        case .checkForUpdates:
-            return "arrow.triangle.2.circlepath"
-        case .commandPalette:
-            return "square.grid.2x2"
-        case .newWindow:
-            return "macwindow.badge.plus"
-        case .newTab:
-            return "plus"
-        case .closeCurrentSession:
-            return "xmark"
-        case .closePane:
-            return "rectangle.portrait.and.arrow.right"
-        case .splitHorizontal:
-            return "rectangle.split.2x1"
-        case .splitVertical:
-            return "rectangle.split.1x2"
-        case .nextSession:
-            return "arrow.right"
-        case .previousSession:
-            return "arrow.left"
-        case .nextPane:
-            return "rectangle.on.rectangle.angled"
-        case .previousPane:
-            return "rectangle.on.rectangle.angled.fill"
-        case .nextAttention:
-            return "bell"
-        case .copy:
-            return "doc.on.doc"
-        case .paste:
-            return "clipboard"
-        case .selectAll:
-            return "text.cursor"
-        case .quit:
-            return "power"
-        }
     }
 }
 

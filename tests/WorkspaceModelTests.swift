@@ -14,6 +14,82 @@ final class WorkspaceModelTests: XCTestCase {
         XCTAssertNotNil(workspace.focusedPaneID)
     }
 
+    func testUpdateWorkspaceNoteNormalizesLineEndingsAndSkipsEquivalentChanges() throws {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+
+        XCTAssertTrue(workspace.updateWorkspaceNote(body: "Follow up\r\nTomorrow"))
+
+        let firstNote = try XCTUnwrap(workspace.workspaceNote)
+        XCTAssertEqual(firstNote.body, "Follow up\nTomorrow")
+
+        XCTAssertFalse(workspace.updateWorkspaceNote(body: "Follow up\nTomorrow"))
+        XCTAssertEqual(workspace.workspaceNote, firstNote)
+    }
+
+    func testWhitespaceOnlyWorkspaceNoteClearsStoredValue() {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+
+        XCTAssertTrue(workspace.updateWorkspaceNote(body: "Remember this"))
+        XCTAssertTrue(workspace.updateWorkspaceNote(body: "  \n\t  "))
+        XCTAssertNil(workspace.workspaceNote)
+    }
+
+    func testClearWorkspaceNoteReportsStateChanges() {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+
+        XCTAssertFalse(workspace.clearWorkspaceNote())
+        XCTAssertTrue(workspace.updateWorkspaceNote(body: "Remember this"))
+        XCTAssertTrue(workspace.clearWorkspaceNote())
+        XCTAssertNil(workspace.workspaceNote)
+    }
+
+    func testUpdateGroupNoteNormalizesLineEndingsAndSkipsEquivalentChanges() throws {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+        let group = workspace.createGroup(name: "Frontend", colorTag: nil)
+
+        XCTAssertTrue(workspace.updateNote(body: "Follow up\r\nTomorrow", forGroup: group.id))
+
+        let firstNote = try XCTUnwrap(workspace.note(forGroup: group.id))
+        XCTAssertEqual(firstNote.body, "Follow up\nTomorrow")
+
+        XCTAssertFalse(workspace.updateNote(body: "Follow up\nTomorrow", forGroup: group.id))
+        XCTAssertEqual(workspace.note(forGroup: group.id), firstNote)
+    }
+
+    func testClearGroupNoteReportsStateChanges() {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+        let group = workspace.createGroup(name: "Frontend", colorTag: nil)
+
+        XCTAssertFalse(workspace.clearNote(forGroup: group.id))
+        XCTAssertTrue(workspace.updateNote(body: "Remember this", forGroup: group.id))
+        XCTAssertTrue(workspace.clearNote(forGroup: group.id))
+        XCTAssertNil(workspace.note(forGroup: group.id))
+    }
+
+    func testActiveScopeNoteTracksSelectedGroup() {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+        let group = workspace.createGroup(name: "Frontend", colorTag: nil)
+
+        XCTAssertTrue(workspace.updateWorkspaceNote(body: "ungrouped note"))
+        XCTAssertTrue(workspace.updateNote(body: "group note", forGroup: group.id))
+        XCTAssertEqual(workspace.activeScopeNote?.body, "ungrouped note")
+
+        XCTAssertTrue(workspace.selectGroup(id: group.id))
+        XCTAssertEqual(workspace.activeScopeNote?.body, "group note")
+
+        XCTAssertTrue(workspace.selectGroup(id: nil))
+        XCTAssertEqual(workspace.activeScopeNote?.body, "ungrouped note")
+    }
+
+    func testDeleteGroupRemovesScopedNote() {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+        let group = workspace.createGroup(name: "Frontend", colorTag: nil)
+
+        XCTAssertTrue(workspace.updateNote(body: "group note", forGroup: group.id))
+        XCTAssertTrue(workspace.deleteGroup(id: group.id))
+        XCTAssertNil(workspace.note(forGroup: group.id))
+    }
+
     func testWorkspaceMetadataSnapshotResolvesFromActiveContext() {
         let workspace = makeTestWorkspace(autoStartSessions: false)
         let activeID = try! XCTUnwrap(workspace.activeSessionID)

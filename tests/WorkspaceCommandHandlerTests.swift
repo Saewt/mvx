@@ -87,6 +87,33 @@ final class WorkspaceCommandHandlerTests: XCTestCase {
         XCTAssertEqual(workspace.focusedPaneID, secondPane)
     }
 
+    func testSplitCommandsBuildRequestedThreeAndFourPaneLayouts() throws {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+        let handler = WorkspaceCommandHandler(workspace: workspace)
+
+        _ = handler.perform(.splitHorizontal)
+        _ = handler.perform(.splitVertical)
+
+        var rootPane = try XCTUnwrap(workspace.workspaceGraph.rootPane)
+        XCTAssertEqual(rootPane.axis, .horizontal)
+        XCTAssertEqual(rootPane.children.count, 2)
+        XCTAssertEqual(rootPane.children[0].axis, .vertical)
+        XCTAssertTrue(rootPane.children[1].isLeaf)
+
+        _ = handler.perform(.splitVertical)
+
+        rootPane = try XCTUnwrap(workspace.workspaceGraph.rootPane)
+        XCTAssertEqual(workspace.workspaceGraph.paneCount, 4)
+        XCTAssertEqual(rootPane.axis, .horizontal)
+        XCTAssertEqual(rootPane.children.count, 2)
+        XCTAssertEqual(rootPane.children[0].axis, .vertical)
+        XCTAssertEqual(rootPane.children[1].axis, .vertical)
+        XCTAssertEqual(rootPane.children[0].children.count, 2)
+        XCTAssertEqual(rootPane.children[1].children.count, 2)
+        XCTAssertTrue(rootPane.children[0].children.allSatisfy(\.isLeaf))
+        XCTAssertTrue(rootPane.children[1].children.allSatisfy(\.isLeaf))
+    }
+
     func testNextSessionCyclesSelectionAndQuitSetsFlag() throws {
         let workspace = makeTestWorkspace(autoStartSessions: false)
         let handler = WorkspaceCommandHandler(workspace: workspace)

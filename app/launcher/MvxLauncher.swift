@@ -7,6 +7,7 @@ struct MvxLauncher: App {
     @StateObject private var commandHandler: WorkspaceCommandHandler
     @StateObject private var updateController: ReleaseUpdateController
     private let workspacePersistence: WorkspacePersistence
+    private let workspaceAutosaveController: WorkspaceAutosaveController
     private let terminalHostFactory: TerminalHostFactory
     private let blockedMessage: String?
     private let blockedDetails: [String]
@@ -32,6 +33,10 @@ struct MvxLauncher: App {
             }
 
             self.workspacePersistence = resolvedPersistence
+            self.workspaceAutosaveController = WorkspaceAutosaveController(
+                workspace: resolvedWorkspace,
+                persistence: resolvedPersistence
+            )
             self.terminalHostFactory = terminalHostFactory
             self.blockedMessage = nil
             self.blockedDetails = []
@@ -51,6 +56,10 @@ struct MvxLauncher: App {
             )
 
             self.workspacePersistence = resolvedPersistence
+            self.workspaceAutosaveController = WorkspaceAutosaveController(
+                workspace: resolvedWorkspace,
+                persistence: resolvedPersistence
+            )
             self.terminalHostFactory = .fallbackOnly
             self.blockedMessage = message
             self.blockedDetails = details
@@ -76,7 +85,7 @@ struct MvxLauncher: App {
                     terminalHostFactory: terminalHostFactory
                 )
                 .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
-                    try? workspacePersistence.save(workspace.snapshot())
+                    try? workspaceAutosaveController.persistNow()
                 }
             }
         }

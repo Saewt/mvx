@@ -28,6 +28,7 @@ public struct SessionGroupHeaderView: View {
     public var body: some View {
         let aggregateStatus = workspace.aggregatedAgentStatus(forGroup: group.id)
         let sessionCount = workspace.sessions(inGroup: group.id).count
+        let collapseActionLabel = Self.collapseActionLabel(isCollapsed: group.isCollapsed)
 
         return HStack(spacing: 8) {
             Button {
@@ -39,6 +40,8 @@ public struct SessionGroupHeaderView: View {
                     .frame(width: 14, height: 14)
             }
             .buttonStyle(.plain)
+            .help(collapseActionLabel)
+            .accessibilityLabel(Text(collapseActionLabel))
 
             if let colorTag = group.colorTag {
                 Circle()
@@ -132,6 +135,10 @@ public struct SessionGroupHeaderView: View {
                 _ = workspace.deleteGroup(id: group.id)
             }
         }
+    }
+
+    static func collapseActionLabel(isCollapsed: Bool) -> String {
+        isCollapsed ? "Expand Group" : "Collapse Group"
     }
 
     private func activateInitialRenameIfNeeded() {

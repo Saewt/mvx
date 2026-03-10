@@ -64,4 +64,19 @@ public struct AppPreferences: Codable, Equatable {
 
         return configuration
     }
+
+    enum CodingKeys: String, CodingKey {
+        case themeName
+        case fontFamily
+        case fontSize
+        case colorOverrides
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.themeName = try container.decodeIfPresent(String.self, forKey: .themeName) ?? ThemePreset.catppuccin.displayName
+        self.fontFamily = try container.decodeIfPresent(String.self, forKey: .fontFamily)
+        self.fontSize = try container.decodeIfPresent(Double.self, forKey: .fontSize) ?? 13
+        self.colorOverrides = try container.decodeIfPresent([String: String].self, forKey: .colorOverrides) ?? [:]
+    }
 }

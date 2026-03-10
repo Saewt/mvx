@@ -59,4 +59,34 @@ final class AppearanceConfigTests: XCTestCase {
 
         XCTAssertEqual(loaded, preferences.validated())
     }
+
+    func testLegacyUsageKeyIsIgnoredDuringDecode() throws {
+        let json = """
+        {
+            "themeName": "Nord",
+            "fontFamily": "Monaco",
+            "fontSize": 14,
+            "colorOverrides": { "cursor": "#ABCDEF" },
+            "usage": {
+                "adminApiKey": "sk-ant-admin01-test",
+                "monthlyBudget": 50.0,
+                "billingCycleStartDay": 12,
+                "refreshIntervalMinutes": 5,
+                "enabled": true
+            }
+        }
+        """.data(using: .utf8)!
+
+        let decoded = try JSONDecoder().decode(AppPreferences.self, from: json)
+
+        XCTAssertEqual(
+            decoded,
+            AppPreferences(
+                themeName: "Nord",
+                fontFamily: "Monaco",
+                fontSize: 14,
+                colorOverrides: ["cursor": "#ABCDEF"]
+            )
+        )
+    }
 }

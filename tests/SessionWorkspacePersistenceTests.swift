@@ -19,6 +19,7 @@ final class SessionWorkspacePersistenceTests: XCTestCase {
         let encoded = try JSONEncoder().encode(snapshot)
         let payload = try XCTUnwrap(String(data: encoded, encoding: .utf8))
         XCTAssertFalse(payload.contains("\"transcript\""))
+        XCTAssertFalse(payload.contains("sessionStartedAt"))
     }
 
     func testRestoreRebuildsSessionsFromSnapshotWithoutTranscriptState() throws {
@@ -36,6 +37,26 @@ final class SessionWorkspacePersistenceTests: XCTestCase {
         XCTAssertEqual(workspace.sessionIDs(), [firstID, second.id])
         XCTAssertEqual(workspace.activeSessionID, firstID)
         XCTAssertNotNil(workspace.workspaceGraph.rootPane)
+    }
+
+    func testWorkspaceSnapshotRoundTripsGroupedAndUngroupedNotes() throws {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+        let group = workspace.createGroup(name: "Frontend", colorTag: nil)
+        XCTAssertTrue(workspace.updateWorkspaceNote(body: "Review output\nShip follow-up"))
+        XCTAssertTrue(workspace.updateNote(body: "Frontend todo", forGroup: group.id))
+
+        let snapshot = workspace.snapshot()
+        let encoded = try JSONEncoder().encode(snapshot)
+        let decoded = try JSONDecoder().decode(WorkspaceSnapshot.self, from: encoded)
+        let restored = makeTestWorkspace(autoStartSessions: false, startsWithSession: false)
+
+        XCTAssertEqual(snapshot.workspaceNote?.body, "Review output\nShip follow-up")
+        XCTAssertEqual(snapshot.sessionGroups.first?.note?.body, "Frontend todo")
+        XCTAssertEqual(decoded.workspaceNote, snapshot.workspaceNote)
+        XCTAssertEqual(decoded.sessionGroups.first?.note, snapshot.sessionGroups.first?.note)
+        XCTAssertTrue(restored.restore(from: snapshot))
+        XCTAssertEqual(restored.workspaceNote, snapshot.workspaceNote)
+        XCTAssertEqual(restored.sessionGroups.first?.note, snapshot.sessionGroups.first?.note)
     }
 
     func testWorkspacePersistenceLoadsLegacySnapshotWithoutTranscriptFieldAccess() throws {
@@ -74,6 +95,7 @@ final class SessionWorkspacePersistenceTests: XCTestCase {
         XCTAssertEqual(loaded.schemaVersion, 3)
         XCTAssertEqual(loaded.sessions.count, 1)
         XCTAssertEqual(loaded.sessions.first?.descriptor.workingDirectoryPath, "/tmp/demo")
+        XCTAssertNil(loaded.workspaceNote)
     }
 
     func testRegistryPersistenceRestoresWorkspaceOrderAndSelection() throws {
@@ -84,6 +106,7 @@ final class SessionWorkspacePersistenceTests: XCTestCase {
 
         let first = registry.createWorkspace(name: "Alpha")
         let second = registry.createWorkspace(name: "Beta")
+        XCTAssertTrue(registry.workspace(for: first.id)?.updateWorkspaceNote(body: "Alpha follow-up") ?? false)
         XCTAssertTrue(registry.activateWorkspace(id: second.id))
 
         try persistence.saveRegistry(registry.registrySnapshot())
@@ -96,6 +119,7 @@ final class SessionWorkspacePersistenceTests: XCTestCase {
         XCTAssertEqual(restoredRegistry.entries.map(\.name), ["Alpha", "Beta"])
         XCTAssertEqual(restoredRegistry.activeWorkspaceID, second.id)
         XCTAssertEqual(restoredRegistry.workspace(for: first.id)?.sessions.count, 1)
+        XCTAssertEqual(restoredRegistry.workspace(for: first.id)?.workspaceNote?.body, "Alpha follow-up")
     }
 
     private func temporaryWorkspaceURL() -> URL {

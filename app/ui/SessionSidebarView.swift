@@ -36,6 +36,17 @@ public struct WorkspaceCardVisualState: Equatable {
     }
 }
 
+public struct SessionSidebarSectionState: Equatable {
+    public let showsUngroupedSection: Bool
+
+    @MainActor
+    public static func resolve(workspace: SessionWorkspace) -> SessionSidebarSectionState {
+        SessionSidebarSectionState(
+            showsUngroupedSection: !workspace.sessions(inGroup: nil).isEmpty
+        )
+    }
+}
+
 @MainActor
 public struct SessionSidebarView: View {
     @ObservedObject private var workspace: SessionWorkspace
@@ -70,15 +81,17 @@ public struct SessionSidebarView: View {
 
                 Spacer()
 
-                ForEach(Array(chrome.topActionSymbols.enumerated()), id: \.offset) { index, symbol in
-                    railActionButton(symbolName: symbol, index: index)
+                ForEach(chrome.topActions) { action in
+                    railActionButton(action)
                 }
 
-                chromeButton(symbolName: "folder.badge.plus", action: createGroup)
+                WorkspaceNotesCardView(workspace: workspace, metadata: metadata)
+
+                chromeButton(symbolName: "folder.badge.plus", tooltip: "New Group", action: createGroup)
                     .accessibilityLabel("New Group")
 
                 if let onCollapse {
-                    chromeButton(symbolName: "chevron.left", action: onCollapse)
+                    chromeButton(symbolName: "chevron.left", tooltip: "Hide Sidebar", action: onCollapse)
                         .accessibilityLabel("Hide Sidebar")
                 }
             }
@@ -260,21 +273,13 @@ public struct SessionSidebarView: View {
         }
     }
 
-    private func railActionButton(symbolName: String, index: Int) -> some View {
-        let command: WorkspaceCommand
-        switch index {
-        case 0:
-            command = .commandPalette
-        case 1:
-            command = .nextAttention
-        default:
-            command = .newTab
-        }
-
-        let isEnabled = commandHandler.availableCommands().first(where: { $0.command == command })?.isEnabled ?? true
-
-        return chromeButton(symbolName: symbolName, isEnabled: isEnabled) {
-            _ = commandHandler.perform(command)
+    private func railActionButton(_ action: SessionRailChromeState.TopAction) -> some View {
+        chromeButton(
+            symbolName: action.symbolName,
+            isEnabled: action.isEnabled,
+            tooltip: action.tooltip
+        ) {
+            _ = commandHandler.perform(action.command)
         }
     }
 
@@ -286,14 +291,17 @@ public struct SessionSidebarView: View {
             }
         } else {
             let ungrouped = workspace.sessions(inGroup: nil)
+            let sectionState = SessionSidebarSectionState.resolve(workspace: workspace)
 
-            ungroupedSectionHeader(
-                sessionCount: ungrouped.count,
-                isActive: workspace.activeGroupID == nil
-            )
+            if sectionState.showsUngroupedSection {
+                ungroupedSectionHeader(
+                    sessionCount: ungrouped.count,
+                    isActive: workspace.activeGroupID == nil
+                )
 
-            ForEach(ungrouped) { descriptor in
-                sessionRow(for: descriptor, focusedSessionID: focusedSessionID)
+                ForEach(ungrouped) { descriptor in
+                    sessionRow(for: descriptor, focusedSessionID: focusedSessionID)
+                }
             }
 
             ForEach(workspace.sessionGroups) { group in
@@ -371,11 +379,19 @@ public struct SessionSidebarView: View {
     private func chromeButton(
         symbolName: String,
         isEnabled: Bool = true,
+        tooltip: String? = nil,
         action: @escaping () -> Void
     ) -> some View {
-        Button(action: action) {
+        Button {
+            guard isEnabled else {
+                return
+            }
+
+            action()
+        } label: {
             Image(systemName: symbolName)
                 .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(isEnabled ? Color.primary : Color.secondary.opacity(0.72))
                 .frame(width: 26, height: 26)
                 .background(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
@@ -383,7 +399,7 @@ public struct SessionSidebarView: View {
                 )
         }
         .buttonStyle(.plain)
-        .disabled(!isEnabled)
+        .help(tooltip ?? "")
     }
 
     private func createGroup() {

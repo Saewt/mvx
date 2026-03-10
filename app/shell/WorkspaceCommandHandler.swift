@@ -21,6 +21,84 @@ public enum WorkspaceCommand: String, Equatable, Hashable {
     case paste
     case selectAll
     case quit
+
+    public var title: String {
+        switch self {
+        case .checkForUpdates:
+            return "Check for Updates"
+        case .commandPalette:
+            return "Command Palette"
+        case .newWindow:
+            return "New Window"
+        case .newTab:
+            return "New Tab"
+        case .closeCurrentSession:
+            return "Close Session"
+        case .closePane:
+            return "Close Pane"
+        case .splitHorizontal:
+            return "Split Horizontal"
+        case .splitVertical:
+            return "Split Vertical"
+        case .nextSession:
+            return "Next Session"
+        case .previousSession:
+            return "Previous Session"
+        case .nextPane:
+            return "Next Pane"
+        case .previousPane:
+            return "Previous Pane"
+        case .nextAttention:
+            return "Next Session Needing Attention"
+        case .copy:
+            return "Copy"
+        case .paste:
+            return "Paste"
+        case .selectAll:
+            return "Select All"
+        case .quit:
+            return "Quit mvx"
+        }
+    }
+
+    public var symbolName: String {
+        switch self {
+        case .checkForUpdates:
+            return "arrow.triangle.2.circlepath"
+        case .commandPalette:
+            return "square.grid.2x2"
+        case .newWindow:
+            return "macwindow.badge.plus"
+        case .newTab:
+            return "plus"
+        case .closeCurrentSession:
+            return "xmark"
+        case .closePane:
+            return "rectangle.portrait.and.arrow.right"
+        case .splitHorizontal:
+            return "rectangle.split.1x2"
+        case .splitVertical:
+            return "rectangle.split.2x1"
+        case .nextSession:
+            return "arrow.right"
+        case .previousSession:
+            return "arrow.left"
+        case .nextPane:
+            return "rectangle.on.rectangle.angled"
+        case .previousPane:
+            return "rectangle.on.rectangle.angled.fill"
+        case .nextAttention:
+            return "bell"
+        case .copy:
+            return "doc.on.doc"
+        case .paste:
+            return "clipboard"
+        case .selectAll:
+            return "text.cursor"
+        case .quit:
+            return "power"
+        }
+    }
 }
 
 public struct WorkspaceCommandDescriptor: Identifiable, Equatable {
@@ -71,10 +149,10 @@ public final class WorkspaceCommandHandler: ObservableObject {
             _ = workspace.closeFocusedPane()
             return nil
         case .splitHorizontal:
-            _ = workspace.splitActivePane(.horizontal)
+            _ = workspace.performAdaptiveSplit(.horizontal)
             return nil
         case .splitVertical:
-            _ = workspace.splitActivePane(.vertical)
+            _ = workspace.performAdaptiveSplit(.vertical)
             return nil
         case .nextSession:
             _ = workspace.selectNextSession()
@@ -165,22 +243,22 @@ public final class WorkspaceCommandHandler: ObservableObject {
         let activeGroupSessionCount = workspace.sessions(inGroup: workspace.activeGroupID).count
 
         return [
-            WorkspaceCommandDescriptor(command: .commandPalette, title: "Command Palette", keywords: ["search", "actions"]),
-            WorkspaceCommandDescriptor(command: .newWindow, title: "New Window", keywords: ["session", "create"]),
-            WorkspaceCommandDescriptor(command: .newTab, title: "New Tab", keywords: ["session", "create"]),
-            WorkspaceCommandDescriptor(command: .closeCurrentSession, title: "Close Session", keywords: ["tab", "close"], isEnabled: workspace.activeSessionID != nil),
-            WorkspaceCommandDescriptor(command: .closePane, title: "Close Pane", keywords: ["split", "pane", "close"], isEnabled: workspace.workspaceGraph.paneCount > 1),
-            WorkspaceCommandDescriptor(command: .splitHorizontal, title: "Split Horizontal", keywords: ["pane", "layout", "horizontal"], isEnabled: workspace.activeSessionID != nil),
-            WorkspaceCommandDescriptor(command: .splitVertical, title: "Split Vertical", keywords: ["pane", "layout", "vertical"], isEnabled: workspace.activeSessionID != nil),
-            WorkspaceCommandDescriptor(command: .nextSession, title: "Next Session", keywords: ["cycle", "tab"], isEnabled: activeGroupSessionCount > 1),
-            WorkspaceCommandDescriptor(command: .previousSession, title: "Previous Session", keywords: ["cycle", "tab"], isEnabled: activeGroupSessionCount > 1),
-            WorkspaceCommandDescriptor(command: .nextPane, title: "Next Pane", keywords: ["cycle", "pane"], isEnabled: workspace.workspaceGraph.paneCount > 1),
-            WorkspaceCommandDescriptor(command: .previousPane, title: "Previous Pane", keywords: ["cycle", "pane"], isEnabled: workspace.workspaceGraph.paneCount > 1),
-            WorkspaceCommandDescriptor(command: .nextAttention, title: "Next Session Needing Attention", keywords: ["waiting", "error", "badge"], isEnabled: workspace.nextAttentionSessionID() != nil),
-            WorkspaceCommandDescriptor(command: .copy, title: "Copy", keywords: ["clipboard"], isEnabled: workspace.activeSessionID != nil),
-            WorkspaceCommandDescriptor(command: .paste, title: "Paste", keywords: ["clipboard"], isEnabled: workspace.activeSessionID != nil),
-            WorkspaceCommandDescriptor(command: .selectAll, title: "Select All", keywords: ["selection", "content"], isEnabled: workspace.activeSessionID != nil),
-            WorkspaceCommandDescriptor(command: .quit, title: "Quit mvx", keywords: ["exit", "application"]),
+            WorkspaceCommandDescriptor(command: .commandPalette, title: WorkspaceCommand.commandPalette.title, keywords: ["search", "actions"]),
+            WorkspaceCommandDescriptor(command: .newWindow, title: WorkspaceCommand.newWindow.title, keywords: ["session", "create"]),
+            WorkspaceCommandDescriptor(command: .newTab, title: WorkspaceCommand.newTab.title, keywords: ["session", "create"]),
+            WorkspaceCommandDescriptor(command: .closeCurrentSession, title: WorkspaceCommand.closeCurrentSession.title, keywords: ["tab", "close"], isEnabled: workspace.activeSessionID != nil),
+            WorkspaceCommandDescriptor(command: .closePane, title: WorkspaceCommand.closePane.title, keywords: ["split", "pane", "close"], isEnabled: workspace.workspaceGraph.paneCount > 1),
+            WorkspaceCommandDescriptor(command: .splitHorizontal, title: WorkspaceCommand.splitHorizontal.title, keywords: ["pane", "layout", "horizontal"], isEnabled: workspace.activeSessionID != nil),
+            WorkspaceCommandDescriptor(command: .splitVertical, title: WorkspaceCommand.splitVertical.title, keywords: ["pane", "layout", "vertical"], isEnabled: workspace.activeSessionID != nil),
+            WorkspaceCommandDescriptor(command: .nextSession, title: WorkspaceCommand.nextSession.title, keywords: ["cycle", "tab"], isEnabled: activeGroupSessionCount > 1),
+            WorkspaceCommandDescriptor(command: .previousSession, title: WorkspaceCommand.previousSession.title, keywords: ["cycle", "tab"], isEnabled: activeGroupSessionCount > 1),
+            WorkspaceCommandDescriptor(command: .nextPane, title: WorkspaceCommand.nextPane.title, keywords: ["cycle", "pane"], isEnabled: workspace.workspaceGraph.paneCount > 1),
+            WorkspaceCommandDescriptor(command: .previousPane, title: WorkspaceCommand.previousPane.title, keywords: ["cycle", "pane"], isEnabled: workspace.workspaceGraph.paneCount > 1),
+            WorkspaceCommandDescriptor(command: .nextAttention, title: WorkspaceCommand.nextAttention.title, keywords: ["waiting", "error", "badge"], isEnabled: workspace.nextAttentionSessionID() != nil),
+            WorkspaceCommandDescriptor(command: .copy, title: WorkspaceCommand.copy.title, keywords: ["clipboard"], isEnabled: workspace.activeSessionID != nil),
+            WorkspaceCommandDescriptor(command: .paste, title: WorkspaceCommand.paste.title, keywords: ["clipboard"], isEnabled: workspace.activeSessionID != nil),
+            WorkspaceCommandDescriptor(command: .selectAll, title: WorkspaceCommand.selectAll.title, keywords: ["selection", "content"], isEnabled: workspace.activeSessionID != nil),
+            WorkspaceCommandDescriptor(command: .quit, title: WorkspaceCommand.quit.title, keywords: ["exit", "application"]),
         ]
     }
 

@@ -43,7 +43,7 @@ final class WorkspaceShellLayoutTests: XCTestCase {
 
         let chrome = SessionRailChromeState.resolve(workspace: workspace)
 
-        XCTAssertEqual(chrome.topActionSymbols, ["square.grid.2x2", "bell", "plus"])
+        XCTAssertEqual(chrome.topActions.map(\.symbolName), ["square.grid.2x2", "bell", "plus"])
         XCTAssertEqual(chrome.sessionCount, 3)
         XCTAssertEqual(chrome.attentionCount, 2)
         XCTAssertEqual(chrome.activeSessionTitle, third.displayTitle)

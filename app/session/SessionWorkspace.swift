@@ -123,11 +123,13 @@ public final class SessionWorkspace: ObservableObject {
     @Published public private(set) var sessionGroupAssignments: [UUID: UUID]
     @Published public private(set) var quitRequested = false
     @Published public private(set) var sessionGitChanges: [UUID: WorkspaceGitChangeSummary]
+    @Published public private(set) var workspaceNote: WorkspaceNoteSnapshot?
 
     public let autoStartSessions: Bool
 
     private let sessionFactory: () -> TerminalSession
     private var runtimes: [UUID: TerminalSession]
+    private var sessionStartedAtByID: [UUID: Date]
     private var nextOrdinal: Int
     private var ungroupedGraph: WorkspaceGraph
     private var pendingGitRefreshSessionIDs: Set<UUID>
@@ -150,7 +152,9 @@ public final class SessionWorkspace: ObservableObject {
         self.sessionGroups = []
         self.sessionGroupAssignments = [:]
         self.sessionGitChanges = [:]
+        self.workspaceNote = nil
         self.runtimes = [:]
+        self.sessionStartedAtByID = [:]
         self.nextOrdinal = 1
         self.ungroupedGraph = WorkspaceGraph()
         self.pendingGitRefreshSessionIDs = []
@@ -189,12 +193,20 @@ public final class SessionWorkspace: ObservableObject {
         return cachedWorkspaceMetadata ?? WorkspaceMetadataSnapshot.resolve(workspace: self)
     }
 
+    public var activeScopeNote: WorkspaceNoteSnapshot? {
+        note(forGroup: activeGroupID)
+    }
+
     public func descriptor(for id: UUID) -> SessionDescriptor? {
         sessions.first(where: { $0.id == id })
     }
 
     public func session(for id: UUID) -> TerminalSession? {
         runtimes[id]
+    }
+
+    func sessionStartedAt(for id: UUID) -> Date? {
+        sessionStartedAtByID[id]
     }
 
     public func sessionIDs() -> [UUID] {
@@ -222,6 +234,78 @@ public final class SessionWorkspace: ObservableObject {
             partial.addedCount += summary.addedCount
             partial.removedCount += summary.removedCount
         }
+    }
+
+    @discardableResult
+    public func updateWorkspaceNote(body: String) -> Bool {
+        updateNote(body: body, forGroup: nil)
+    }
+
+    @discardableResult
+    public func updateNote(body: String, forGroup groupID: UUID?) -> Bool {
+        let normalizedBody = Self.normalizedWorkspaceNoteBody(body)
+        if let groupID {
+            guard let index = sessionGroups.firstIndex(where: { $0.id == groupID }) else {
+                return false
+            }
+
+            guard sessionGroups[index].note?.body != normalizedBody else {
+                return false
+            }
+
+            guard let normalizedBody else {
+                sessionGroups[index].note = nil
+                return true
+            }
+
+            sessionGroups[index].note = WorkspaceNoteSnapshot(body: normalizedBody)
+            return true
+        }
+
+        guard workspaceNote?.body != normalizedBody else {
+            return false
+        }
+
+        guard let normalizedBody else {
+            workspaceNote = nil
+            return true
+        }
+
+        workspaceNote = WorkspaceNoteSnapshot(body: normalizedBody)
+        return true
+    }
+
+    @discardableResult
+    public func clearWorkspaceNote() -> Bool {
+        clearNote(forGroup: nil)
+    }
+
+    @discardableResult
+    public func clearNote(forGroup groupID: UUID?) -> Bool {
+        if let groupID {
+            guard let index = sessionGroups.firstIndex(where: { $0.id == groupID }),
+                  sessionGroups[index].note != nil else {
+                return false
+            }
+
+            sessionGroups[index].note = nil
+            return true
+        }
+
+        guard workspaceNote != nil else {
+            return false
+        }
+
+        workspaceNote = nil
+        return true
+    }
+
+    public func note(forGroup groupID: UUID?) -> WorkspaceNoteSnapshot? {
+        guard let groupID else {
+            return workspaceNote
+        }
+
+        return sessionGroups.first(where: { $0.id == groupID })?.note
     }
 
     public func sessions(inGroup groupID: UUID?) -> [SessionDescriptor] {
@@ -437,9 +521,9 @@ public final class SessionWorkspace: ObservableObject {
         case .setGroupCollapsed(let id, let isCollapsed):
             return setGroupCollapsed(id: id, isCollapsed: isCollapsed)
         case .splitHorizontal:
-            return splitActivePane(.horizontal)
+            return performAdaptiveSplit(.horizontal)
         case .splitVertical:
-            return splitActivePane(.vertical)
+            return performAdaptiveSplit(.vertical)
         }
     }
 
@@ -456,6 +540,7 @@ public final class SessionWorkspace: ObservableObject {
         }
 
         runtimes[descriptor.id] = runtime
+        sessionStartedAtByID[descriptor.id] = Date()
         sessions.append(descriptor)
 
         if let activeGroupID {
@@ -527,6 +612,7 @@ public final class SessionWorkspace: ObservableObject {
             runtime.stop()
         }
 
+        sessionStartedAtByID.removeValue(forKey: id)
         sessionGroupAssignments.removeValue(forKey: id)
         sessions.remove(at: index)
         removeGitChangeSummary(for: id)
@@ -759,8 +845,31 @@ public final class SessionWorkspace: ObservableObject {
 
     @discardableResult
     public func splitActivePane(_ axis: WorkspaceSplitAxis) -> Bool {
+        splitPane(targetPaneID: nil, axis: axis)
+    }
+
+    @discardableResult
+    func performAdaptiveSplit(_ axis: WorkspaceSplitAxis) -> Bool {
+        splitPane(targetPaneID: adaptiveSplitTargetPaneID(for: axis), axis: axis)
+    }
+
+    @discardableResult
+    private func splitPane(targetPaneID: UUID?, axis: WorkspaceSplitAxis) -> Bool {
         let newSession = createSession(selectNewSession: false)
-        guard workspaceGraph.splitFocusedPane(axis: axis, newSessionID: newSession.id) else {
+        let didSplit: Bool
+        if let targetPaneID {
+            didSplit =
+                workspaceGraph.splitPane(
+                    targetPaneID,
+                    axis: axis,
+                    newSessionID: newSession.id,
+                    insertion: .after
+                ) != nil
+        } else {
+            didSplit = workspaceGraph.splitFocusedPane(axis: axis, newSessionID: newSession.id)
+        }
+
+        guard didSplit else {
             _ = removeSessionWithoutReplacement(id: newSession.id)
             return false
         }
@@ -768,6 +877,55 @@ public final class SessionWorkspace: ObservableObject {
         synchronizeActiveSessionID(preferredSessionID: newSession.id, in: activeGroupID)
         setBackingGraph(workspaceGraph, for: activeGroupID)
         scheduleGitRefresh(for: [newSession.id])
+        return true
+    }
+
+    private func adaptiveSplitTargetPaneID(for axis: WorkspaceSplitAxis) -> UUID? {
+        guard axis == .vertical,
+              let rootPane = workspaceGraph.rootPane,
+              rootPane.axis == .horizontal,
+              rootPane.children.count == 2 else {
+            return nil
+        }
+
+        let topNode = rootPane.children[0]
+        let bottomNode = rootPane.children[1]
+
+        if topNode.isLeaf, bottomNode.isLeaf {
+            return topNode.id
+        }
+
+        guard topNode.axis == .vertical,
+              topNode.children.count == 2,
+              topNode.children.allSatisfy(\.isLeaf),
+              bottomNode.isLeaf else {
+            return nil
+        }
+
+        return bottomNode.id
+    }
+
+    private func adaptivelyPlaceSession(id sessionID: UUID) -> Bool {
+        guard let rootPane = workspaceGraph.rootPane else { return false }
+
+        // 1 pane → force horizontal split (top/bottom)
+        if rootPane.isLeaf {
+            guard let insertedPaneID = workspaceGraph.splitPane(
+                rootPane.id, axis: .horizontal, newSessionID: sessionID, insertion: .after
+            ) else { return false }
+            _ = workspaceGraph.focusPane(insertedPaneID)
+            return true
+        }
+
+        // 2-3 panes → use existing adaptive vertical target
+        guard let targetID = adaptiveSplitTargetPaneID(for: .vertical) else {
+            return false  // 4+ panes: no adaptive placement
+        }
+
+        guard let insertedPaneID = workspaceGraph.splitPane(
+            targetID, axis: .vertical, newSessionID: sessionID, insertion: .after
+        ) else { return false }
+        _ = workspaceGraph.focusPane(insertedPaneID)
         return true
     }
 
@@ -966,7 +1124,8 @@ public final class SessionWorkspace: ObservableObject {
                 name: group.name,
                 colorTag: group.colorTag,
                 isCollapsed: group.isCollapsed,
-                paneGraph: group.paneGraph
+                paneGraph: group.paneGraph,
+                note: group.note
             )
         }
         let persistedAssignments = sessionGroupAssignments.reduce(into: [String: String]()) { partial, entry in
@@ -980,7 +1139,8 @@ public final class SessionWorkspace: ObservableObject {
             workspaceGraph: ungroupedGraph,
             sessionGroups: persistedGroups,
             activeGroupID: activeGroupID,
-            sessionGroupAssignments: persistedAssignments
+            sessionGroupAssignments: persistedAssignments,
+            workspaceNote: workspaceNote
         )
     }
 
@@ -995,6 +1155,7 @@ public final class SessionWorkspace: ObservableObject {
         }
 
         runtimes.removeAll()
+        sessionStartedAtByID.removeAll()
         sessions.removeAll()
         activeSessionID = nil
         activeGroupID = nil
@@ -1006,11 +1167,13 @@ public final class SessionWorkspace: ObservableObject {
                 name: group.name,
                 colorTag: group.colorTag,
                 isCollapsed: group.isCollapsed,
-                paneGraph: group.paneGraph ?? WorkspaceGraph()
+                paneGraph: group.paneGraph ?? WorkspaceGraph(),
+                note: group.note
             )
         }
         sessionGroupAssignments = [:]
         sessionGitChanges = [:]
+        workspaceNote = snapshot.workspaceNote
         pendingGitRefreshSessionIDs.removeAll()
         gitRefreshTask?.cancel()
         gitRefreshTask = nil
@@ -1025,6 +1188,7 @@ public final class SessionWorkspace: ObservableObject {
             return true
         }
 
+        let restoredAt = Date()
         for persisted in snapshot.sessions {
             let descriptor = persisted.descriptor
             let runtime = sessionFactory()
@@ -1034,6 +1198,7 @@ public final class SessionWorkspace: ObservableObject {
             }
 
             runtimes[descriptor.id] = runtime
+            sessionStartedAtByID[descriptor.id] = restoredAt
             sessions.append(descriptor)
         }
 
@@ -1067,6 +1232,18 @@ public final class SessionWorkspace: ObservableObject {
         synchronizeActiveSessionID(preferredSessionID: snapshot.activeSessionID, in: restoredActiveGroupID)
         scheduleGitRefresh(for: Set(workspaceGraph.leafSessionIDs))
         return true
+    }
+
+    private static func normalizedWorkspaceNoteBody(_ body: String) -> String? {
+        let normalized = body
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+
+        guard !normalized.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return nil
+        }
+
+        return normalized
     }
 
     private func cycleSelection(step: Int) -> Bool {
@@ -1169,6 +1346,15 @@ public final class SessionWorkspace: ObservableObject {
                 return true
             }
 
+            // Not in a pane → ADD: try adaptive placement first
+            if adaptivelyPlaceSession(id: payload.id) {
+                synchronizeActiveSessionID(preferredSessionID: payload.id, in: activeGroupID)
+                setBackingGraph(workspaceGraph, for: activeGroupID)
+                scheduleGitRefresh(for: focusedLeafSessionIDs().union([payload.id]))
+                return true
+            }
+
+            // Fallback: explicit drop zone placement (5+ panes)
             guard let insertedPaneID = workspaceGraph.splitPane(
                 targetPaneID,
                 axis: axis,
@@ -1200,6 +1386,7 @@ public final class SessionWorkspace: ObservableObject {
             runtime.stop()
         }
 
+        sessionStartedAtByID.removeValue(forKey: id)
         sessionGroupAssignments.removeValue(forKey: id)
         sessions.remove(at: index)
         removeGitChangeSummary(for: id)
@@ -1574,7 +1761,7 @@ public final class SessionWorkspace: ObservableObject {
                         return
                     }
 
-                    _ = self.splitActivePane(axis)
+                    _ = self.performAdaptiveSplit(axis)
                 }
             }
         }

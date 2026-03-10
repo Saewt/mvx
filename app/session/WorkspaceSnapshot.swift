@@ -1,7 +1,7 @@
 import Foundation
 
 public struct WorkspaceSnapshot: Codable, Equatable {
-    public static let currentSchemaVersion = 6
+    public static let currentSchemaVersion = 8
 
     public struct PersistedSession: Codable, Equatable {
         public var descriptor: SessionDescriptor
@@ -17,19 +17,22 @@ public struct WorkspaceSnapshot: Codable, Equatable {
         public var colorTag: SessionGroupColor?
         public var isCollapsed: Bool
         public var paneGraph: WorkspaceGraph?
+        public var note: WorkspaceNoteSnapshot?
 
         public init(
             id: UUID,
             name: String,
             colorTag: SessionGroupColor?,
             isCollapsed: Bool,
-            paneGraph: WorkspaceGraph? = nil
+            paneGraph: WorkspaceGraph? = nil,
+            note: WorkspaceNoteSnapshot? = nil
         ) {
             self.id = id
             self.name = name
             self.colorTag = colorTag
             self.isCollapsed = isCollapsed
             self.paneGraph = paneGraph
+            self.note = note
         }
     }
 
@@ -41,6 +44,7 @@ public struct WorkspaceSnapshot: Codable, Equatable {
     public var sessionGroups: [PersistedSessionGroup]
     public var activeGroupID: UUID?
     public var sessionGroupAssignments: [String: String]
+    public var workspaceNote: WorkspaceNoteSnapshot?
 
     public init(
         schemaVersion: Int = WorkspaceSnapshot.currentSchemaVersion,
@@ -50,7 +54,8 @@ public struct WorkspaceSnapshot: Codable, Equatable {
         workspaceGraph: WorkspaceGraph? = nil,
         sessionGroups: [PersistedSessionGroup] = [],
         activeGroupID: UUID? = nil,
-        sessionGroupAssignments: [String: String] = [:]
+        sessionGroupAssignments: [String: String] = [:],
+        workspaceNote: WorkspaceNoteSnapshot? = nil
     ) {
         self.schemaVersion = schemaVersion
         self.sessions = sessions
@@ -60,6 +65,7 @@ public struct WorkspaceSnapshot: Codable, Equatable {
         self.sessionGroups = sessionGroups
         self.activeGroupID = activeGroupID
         self.sessionGroupAssignments = sessionGroupAssignments
+        self.workspaceNote = workspaceNote
     }
 
     public var isSupported: Bool {
@@ -75,6 +81,7 @@ public struct WorkspaceSnapshot: Codable, Equatable {
         case sessionGroups
         case activeGroupID
         case sessionGroupAssignments
+        case workspaceNote
     }
 
     public init(from decoder: Decoder) throws {
@@ -87,5 +94,6 @@ public struct WorkspaceSnapshot: Codable, Equatable {
         sessionGroups = try container.decodeIfPresent([PersistedSessionGroup].self, forKey: .sessionGroups) ?? []
         activeGroupID = try container.decodeIfPresent(UUID.self, forKey: .activeGroupID)
         sessionGroupAssignments = try container.decodeIfPresent([String: String].self, forKey: .sessionGroupAssignments) ?? [:]
+        workspaceNote = try container.decodeIfPresent(WorkspaceNoteSnapshot.self, forKey: .workspaceNote)
     }
 }

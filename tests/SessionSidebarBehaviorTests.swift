@@ -119,6 +119,62 @@ final class SessionSidebarBehaviorTests: XCTestCase {
         XCTAssertEqual(visualState.gitRemovedCount, 2)
     }
 
+    func testDurationStateFormatsCompactElapsedTime() {
+        let startedAt = Date(timeIntervalSinceReferenceDate: 100)
+
+        XCTAssertEqual(
+            SessionTabDurationState.resolve(
+                startedAt: startedAt,
+                isRenaming: false,
+                referenceDate: startedAt.addingTimeInterval(30)
+            ).label,
+            "0m"
+        )
+        XCTAssertEqual(
+            SessionTabDurationState.resolve(
+                startedAt: startedAt,
+                isRenaming: false,
+                referenceDate: startedAt.addingTimeInterval(59 * 60)
+            ).label,
+            "59m"
+        )
+        XCTAssertEqual(
+            SessionTabDurationState.resolve(
+                startedAt: startedAt,
+                isRenaming: false,
+                referenceDate: startedAt.addingTimeInterval(60 * 60)
+            ).label,
+            "1h"
+        )
+        XCTAssertEqual(
+            SessionTabDurationState.resolve(
+                startedAt: startedAt,
+                isRenaming: false,
+                referenceDate: startedAt.addingTimeInterval(24 * 60 * 60)
+            ).label,
+            "1d"
+        )
+    }
+
+    func testDurationStateHidesLabelWhenMissingOrRenaming() {
+        let startedAt = Date(timeIntervalSinceReferenceDate: 200)
+
+        XCTAssertNil(
+            SessionTabDurationState.resolve(
+                startedAt: nil,
+                isRenaming: false,
+                referenceDate: startedAt
+            ).label
+        )
+        XCTAssertNil(
+            SessionTabDurationState.resolve(
+                startedAt: startedAt,
+                isRenaming: true,
+                referenceDate: startedAt.addingTimeInterval(120)
+            ).label
+        )
+    }
+
     func testSplitMenuStateDisablesWithoutFocusedPane() {
         let workspace = makeTestWorkspace(autoStartSessions: false, startsWithSession: false)
 
@@ -354,5 +410,51 @@ final class SessionSidebarBehaviorTests: XCTestCase {
 
         XCTAssertTrue(visualState.showsAttention)
         XCTAssertEqual(visualState.glowColorName, "red")
+    }
+
+    func testSidebarSectionStateHidesUngroupedWhenAllSessionsAreGrouped() {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+        let sessionID = try! XCTUnwrap(workspace.activeSessionID)
+        let group = workspace.createGroup(name: "Backend", colorTag: nil)
+
+        XCTAssertTrue(workspace.assignSession(id: sessionID, toGroup: group.id))
+
+        let state = SessionSidebarSectionState.resolve(workspace: workspace)
+
+        XCTAssertFalse(state.showsUngroupedSection)
+    }
+
+    func testSidebarSectionStateShowsUngroupedWhenUngroupedSessionsRemain() {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+
+        _ = workspace.createGroup(name: "Backend", colorTag: nil)
+
+        let state = SessionSidebarSectionState.resolve(workspace: workspace)
+
+        XCTAssertTrue(state.showsUngroupedSection)
+    }
+
+    func testSidebarSectionStateDoesNotForceActiveGroupWhenUngroupedIsHidden() {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+        let sessionID = try! XCTUnwrap(workspace.activeSessionID)
+        let group = workspace.createGroup(name: "Backend", colorTag: nil)
+
+        XCTAssertTrue(workspace.assignSession(id: sessionID, toGroup: group.id))
+        XCTAssertNil(workspace.activeGroupID)
+
+        _ = SessionSidebarSectionState.resolve(workspace: workspace)
+
+        XCTAssertNil(workspace.activeGroupID)
+    }
+
+    func testGroupCollapseActionLabelReflectsCollapsedState() {
+        XCTAssertEqual(
+            SessionGroupHeaderView.collapseActionLabel(isCollapsed: true),
+            "Expand Group"
+        )
+        XCTAssertEqual(
+            SessionGroupHeaderView.collapseActionLabel(isCollapsed: false),
+            "Collapse Group"
+        )
     }
 }

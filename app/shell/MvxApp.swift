@@ -7,6 +7,7 @@ public struct MvxApp: App {
     @StateObject private var commandHandler: WorkspaceCommandHandler
     @StateObject private var updateController: ReleaseUpdateController
     private let workspacePersistence: WorkspacePersistence
+    private let workspaceAutosaveController: WorkspaceAutosaveController
     private let terminalHostFactory: TerminalHostFactory
 
     public init() {
@@ -20,8 +21,6 @@ public struct MvxApp: App {
         sessionFactory: @escaping () -> TerminalSession,
         terminalHostFactory: TerminalHostFactory
     ) {
-        let resolvedConfigStore = ConfigStore()
-        _ = resolvedConfigStore.load()
         let resolvedPersistence = WorkspacePersistence()
         let resolvedWorkspace = SessionWorkspace(
             startsWithSession: false,
@@ -38,6 +37,10 @@ public struct MvxApp: App {
         }
 
         self.workspacePersistence = resolvedPersistence
+        self.workspaceAutosaveController = WorkspaceAutosaveController(
+            workspace: resolvedWorkspace,
+            persistence: resolvedPersistence
+        )
         self.terminalHostFactory = terminalHostFactory
         let resolvedUpdateController = ReleaseUpdateController()
         _workspace = StateObject(wrappedValue: resolvedWorkspace)
@@ -58,7 +61,7 @@ public struct MvxApp: App {
                 terminalHostFactory: terminalHostFactory
             )
             .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
-                try? workspacePersistence.save(workspace.snapshot())
+                try? workspaceAutosaveController.persistNow()
             }
         }
         .commands {

@@ -87,6 +87,7 @@ final class NativeGhosttyNSView: NSView {
         isFocused: Bool,
         onFocusRequest: @escaping () -> Void
     ) {
+        let didGainFocusIntent = isFocused && !wantsTerminalFocus
         self.session = session
         self.onFocusRequest = onFocusRequest
         wantsTerminalFocus = isFocused
@@ -98,7 +99,7 @@ final class NativeGhosttyNSView: NSView {
             onFocusRequest: onFocusRequest
         )
         NativeGhosttyGeometryCoordinator.shared.scheduleGeometryReconcile()
-        focusIfNeeded()
+        focusIfNeeded(force: didGainFocusIntent)
     }
 
     @discardableResult
@@ -316,12 +317,19 @@ final class NativeGhosttyNSView: NSView {
         return isStable
     }
 
-    private func focusIfNeeded() {
-        guard wantsTerminalFocus else {
+    private func focusIfNeeded(force: Bool = false) {
+        guard wantsTerminalFocus, let window else {
             return
         }
 
-        window?.makeFirstResponder(self)
+        if !force,
+           let firstResponder = window.firstResponder as? NSView,
+           firstResponder !== self,
+           !firstResponder.isDescendant(of: self) {
+            return
+        }
+
+        window.makeFirstResponder(self)
         runtime?.setFocused(true)
         runtime?.reassertDisplayID()
     }
