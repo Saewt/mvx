@@ -21,10 +21,20 @@ public struct MvxApp: App {
         sessionFactory: @escaping () -> TerminalSession,
         terminalHostFactory: TerminalHostFactory
     ) {
+        self.init(
+            sessionFactoryWithStartupDirectory: { _ in sessionFactory() },
+            terminalHostFactory: terminalHostFactory
+        )
+    }
+
+    public init(
+        sessionFactoryWithStartupDirectory: @escaping (URL?) -> TerminalSession,
+        terminalHostFactory: TerminalHostFactory
+    ) {
         let resolvedPersistence = WorkspacePersistence()
         let resolvedWorkspace = SessionWorkspace(
             startsWithSession: false,
-            sessionFactory: sessionFactory
+            sessionFactoryWithStartupDirectory: sessionFactoryWithStartupDirectory
         )
 
         if let savedSnapshot = resolvedPersistence.load() {

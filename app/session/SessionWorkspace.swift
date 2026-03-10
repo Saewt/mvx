@@ -127,7 +127,7 @@ public final class SessionWorkspace: ObservableObject {
 
     public let autoStartSessions: Bool
 
-    private let sessionFactory: () -> TerminalSession
+    private let sessionFactory: (URL?) -> TerminalSession
     private var runtimes: [UUID: TerminalSession]
     private var sessionStartedAtByID: [UUID: Date]
     private var nextOrdinal: Int
@@ -138,13 +138,25 @@ public final class SessionWorkspace: ObservableObject {
     private var cachedWorkspaceMetadata: WorkspaceMetadataSnapshot?
     private var isWorkspaceMetadataDirty = true
 
-    public init(
+    public convenience init(
         autoStartSessions: Bool = true,
         startsWithSession: Bool = true,
         sessionFactory: @escaping () -> TerminalSession = SessionWorkspace.unsupportedSessionFactory()
     ) {
+        self.init(
+            autoStartSessions: autoStartSessions,
+            startsWithSession: startsWithSession,
+            sessionFactoryWithStartupDirectory: { _ in sessionFactory() }
+        )
+    }
+
+    public init(
+        autoStartSessions: Bool = true,
+        startsWithSession: Bool = true,
+        sessionFactoryWithStartupDirectory: @escaping (URL?) -> TerminalSession = SessionWorkspace.unsupportedSessionFactoryWithStartupDirectory()
+    ) {
         self.autoStartSessions = autoStartSessions
-        self.sessionFactory = sessionFactory
+        self.sessionFactory = sessionFactoryWithStartupDirectory
         self.sessions = []
         self.activeSessionID = nil
         self.workspaceGraph = WorkspaceGraph()
@@ -533,7 +545,7 @@ public final class SessionWorkspace: ObservableObject {
         nextOrdinal += 1
 
         let descriptor = SessionDescriptor(ordinal: ordinal)
-        let runtime = sessionFactory()
+        let runtime = sessionFactory(nil)
         configureRuntime(runtime, for: descriptor.id)
         if autoStartSessions {
             runtime.start()
@@ -1191,7 +1203,7 @@ public final class SessionWorkspace: ObservableObject {
         let restoredAt = Date()
         for persisted in snapshot.sessions {
             let descriptor = persisted.descriptor
-            let runtime = sessionFactory()
+            let runtime = sessionFactory(Self.startupDirectoryURL(from: descriptor.workingDirectoryPath))
             configureRuntime(runtime, for: descriptor.id)
             if autoStartSessions {
                 runtime.start()
@@ -1725,6 +1737,21 @@ public final class SessionWorkspace: ObservableObject {
         {
             fatalError("Mvx requires an explicit native terminal sessionFactory")
         }
+    }
+
+    nonisolated public static func unsupportedSessionFactoryWithStartupDirectory() -> (URL?) -> TerminalSession {
+        { _ in
+            fatalError("Mvx requires an explicit native terminal sessionFactory")
+        }
+    }
+
+    private static func startupDirectoryURL(from workingDirectoryPath: String?) -> URL? {
+        guard let normalized = workingDirectoryPath?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !normalized.isEmpty else {
+            return nil
+        }
+
+        return URL(fileURLWithPath: normalized)
     }
 
     private func configureRuntime(_ runtime: TerminalSession, for sessionID: UUID) {

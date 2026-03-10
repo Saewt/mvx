@@ -39,6 +39,57 @@ final class SessionWorkspacePersistenceTests: XCTestCase {
         XCTAssertNotNil(workspace.workspaceGraph.rootPane)
     }
 
+    func testRestorePassesSavedWorkingDirectoryToFactory() throws {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+        let sessionID = try XCTUnwrap(workspace.activeSessionID)
+        XCTAssertTrue(workspace.updateSessionContext(
+            id: sessionID,
+            workingDirectoryPath: "/tmp/demo-project",
+            foregroundProcessName: "zsh"
+        ))
+
+        let snapshot = workspace.snapshot()
+        var capturedStartupDirectory: URL?
+        let restored = makeTestWorkspace(
+            autoStartSessions: false,
+            startsWithSession: false,
+            sessionFactoryWithStartupDirectory: { startupDirectory in
+                capturedStartupDirectory = startupDirectory
+                return makeTestSession()
+            }
+        )
+
+        XCTAssertTrue(restored.restore(from: snapshot))
+        XCTAssertEqual(capturedStartupDirectory?.path, "/tmp/demo-project")
+    }
+
+    func testRestoreNormalizesBlankWorkingDirectoryBeforeCallingFactory() throws {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+        let sessionID = try XCTUnwrap(workspace.activeSessionID)
+        XCTAssertTrue(workspace.updateSessionContext(
+            id: sessionID,
+            workingDirectoryPath: "   \n",
+            foregroundProcessName: "zsh"
+        ))
+
+        let snapshot = workspace.snapshot()
+        var didCallFactory = false
+        var capturedStartupDirectory: URL? = URL(fileURLWithPath: "/tmp/placeholder")
+        let restored = makeTestWorkspace(
+            autoStartSessions: false,
+            startsWithSession: false,
+            sessionFactoryWithStartupDirectory: { startupDirectory in
+                didCallFactory = true
+                capturedStartupDirectory = startupDirectory
+                return makeTestSession()
+            }
+        )
+
+        XCTAssertTrue(restored.restore(from: snapshot))
+        XCTAssertTrue(didCallFactory)
+        XCTAssertNil(capturedStartupDirectory)
+    }
+
     func testWorkspaceSnapshotRoundTripsGroupedAndUngroupedNotes() throws {
         let workspace = makeTestWorkspace(autoStartSessions: false)
         let group = workspace.createGroup(name: "Frontend", colorTag: nil)

@@ -211,11 +211,20 @@ func makeTestSession(
 
 func makeTestWorkspace(
     autoStartSessions: Bool = true,
-    startsWithSession: Bool = true
+    startsWithSession: Bool = true,
+    sessionFactoryWithStartupDirectory: ((URL?) -> TerminalSession)? = nil
 ) -> SessionWorkspace {
     let createWorkspace = {
         MainActor.assumeIsolated {
-            SessionWorkspace(
+            if let sessionFactoryWithStartupDirectory {
+                return SessionWorkspace(
+                    autoStartSessions: autoStartSessions,
+                    startsWithSession: startsWithSession,
+                    sessionFactoryWithStartupDirectory: sessionFactoryWithStartupDirectory
+                )
+            }
+
+            return SessionWorkspace(
                 autoStartSessions: autoStartSessions,
                 startsWithSession: startsWithSession,
                 sessionFactory: { makeTestSession() }

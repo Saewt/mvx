@@ -20,7 +20,7 @@ struct MvxLauncher: App {
         case .ready(let sessionFactory, let terminalHostFactory):
             let resolvedWorkspace = SessionWorkspace(
                 startsWithSession: false,
-                sessionFactory: sessionFactory
+                sessionFactoryWithStartupDirectory: sessionFactory
             )
 
             if let savedSnapshot = resolvedPersistence.load() {
@@ -97,7 +97,7 @@ struct MvxLauncher: App {
 
 private enum LauncherBootstrapResult {
     case ready(
-        sessionFactory: () -> TerminalSession,
+        sessionFactory: (URL?) -> TerminalSession,
         terminalHostFactory: TerminalHostFactory
     )
     case blocked(message: String, details: [String])
@@ -123,10 +123,11 @@ private enum LauncherTerminalBootstrap {
                 return .blocked(message: message, details: details)
             }
 
-            let sessionFactory = {
+            let sessionFactory: (URL?) -> TerminalSession = { startupDirectory in
                 TerminalSession(
                     driver: NativeGhosttySessionDriver(
                         adapter: TerminalAdapter(renderConfiguration: resolvedRenderConfiguration),
+                        startupDirectory: startupDirectory,
                         supportPaths: supportPaths
                     ),
                     backendKind: .nativeGhostty
