@@ -32,4 +32,8 @@ public enum SessionGroupColor: String, Codable, CaseIterable {
     case red
     case purple
     case teal
+
+    public var displayName: String {
+        rawValue.capitalized
+    }
 }

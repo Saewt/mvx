@@ -133,4 +133,23 @@ final class SessionGroupTests: XCTestCase {
         XCTAssertTrue(workspace.handleDroppedSession(identifier: payload, toGroup: group.id))
         XCTAssertEqual(workspace.sessions(inGroup: group.id).map(\.id), [firstID, second.id, third.id])
     }
+
+    func testSetGroupColorTag() {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+        let group = workspace.createGroup(name: "Frontend", colorTag: nil)
+        XCTAssertNil(group.colorTag)
+
+        XCTAssertTrue(workspace.setGroupColorTag(id: group.id, colorTag: .blue))
+        XCTAssertEqual(workspace.sessionGroups.first?.colorTag, .blue)
+
+        XCTAssertTrue(workspace.setGroupColorTag(id: group.id, colorTag: .red))
+        XCTAssertEqual(workspace.sessionGroups.first?.colorTag, .red)
+
+        // Same color → no-op
+        XCTAssertFalse(workspace.setGroupColorTag(id: group.id, colorTag: .red))
+
+        // Clear
+        XCTAssertTrue(workspace.setGroupColorTag(id: group.id, colorTag: nil))
+        XCTAssertNil(workspace.sessionGroups.first?.colorTag)
+    }
 }

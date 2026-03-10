@@ -452,6 +452,18 @@ public final class SessionWorkspace: ObservableObject {
         return true
     }
 
+    @discardableResult
+    public func setGroupColorTag(id: UUID, colorTag: SessionGroupColor?) -> Bool {
+        guard let index = sessionGroups.firstIndex(where: { $0.id == id }) else {
+            return false
+        }
+        guard sessionGroups[index].colorTag != colorTag else {
+            return false
+        }
+        sessionGroups[index].colorTag = colorTag
+        return true
+    }
+
     public func aggregatedAgentStatus(forGroup groupID: UUID) -> SessionAgentStatus {
         let statuses = sessions(inGroup: groupID).map(\.agentStatus)
         if statuses.contains(.error) {

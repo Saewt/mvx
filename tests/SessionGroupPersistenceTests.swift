@@ -36,6 +36,22 @@ final class SessionGroupPersistenceTests: XCTestCase {
         XCTAssertEqual(restored.activeGroupID, frontend.id)
     }
 
+    func testWorkspaceSnapshotPersistsUpdatedAndClearedGroupColorTags() throws {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+        let frontend = workspace.createGroup(name: "Frontend", colorTag: nil)
+        let backend = workspace.createGroup(name: "Backend", colorTag: .green)
+
+        XCTAssertTrue(workspace.setGroupColorTag(id: frontend.id, colorTag: .blue))
+        XCTAssertTrue(workspace.setGroupColorTag(id: backend.id, colorTag: nil))
+
+        let snapshot = workspace.snapshot()
+        let restored = makeTestWorkspace(autoStartSessions: false, startsWithSession: false)
+
+        XCTAssertEqual(snapshot.sessionGroups.map(\.colorTag), [.blue, nil])
+        XCTAssertTrue(restored.restore(from: snapshot))
+        XCTAssertEqual(restored.sessionGroups.map(\.colorTag), [.blue, nil])
+    }
+
     func testV4SnapshotDecodeDefaultsGroupsToEmptyCollections() throws {
         let sessionID = UUID()
         let legacyJSON = """

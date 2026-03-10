@@ -131,6 +131,24 @@ public struct SessionGroupHeaderView: View {
                 )
             }
 
+            Menu("Color") {
+                ForEach(SessionGroupColor.allCases, id: \.self) { colorOption in
+                    Button {
+                        _ = workspace.setGroupColorTag(id: group.id, colorTag: colorOption)
+                    } label: {
+                        Label(colorOption.displayName, systemImage: group.colorTag == colorOption ? "checkmark.circle.fill" : "circle.fill")
+                    }
+                }
+
+                Divider()
+
+                Button("None") {
+                    _ = workspace.setGroupColorTag(id: group.id, colorTag: nil)
+                }
+            }
+
+            Divider()
+
             Button("Delete Group") {
                 _ = workspace.deleteGroup(id: group.id)
             }
