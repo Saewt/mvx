@@ -2,14 +2,14 @@
 set -eu
 
 ROOT_DIR=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
-VERSION=${MVX_RELEASE_VERSION:-0.1.0}
-BUILD=${MVX_BUILD_NUMBER:-1}
+VERSION=${MVX_RELEASE_VERSION:-0.1.2}
+BUILD=${MVX_BUILD_NUMBER:-2}
 OUTPUT_DIR=${MVX_OUTPUT_DIR:-"$ROOT_DIR/.build/release"}
 DOWNLOAD_BASE_URL=${MVX_DOWNLOAD_BASE_URL:-https://downloads.example.com/mvx}
 DMG_PATH=${MVX_DMG_PATH:-"$OUTPUT_DIR/mvx-$VERSION.dmg"}
 APPCAST_PATH=${MVX_APPCAST_PATH:-"$OUTPUT_DIR/appcast.xml"}
 CASK_PATH=${MVX_CASK_PATH:-"$ROOT_DIR/packaging/homebrew/Casks/mvx.rb"}
-HOMEPAGE_URL=${MVX_HOMEPAGE_URL:-https://github.com/emirekici/mvx}
+HOMEPAGE_URL=${MVX_HOMEPAGE_URL:-https://github.com/Saewt/mvx}
 
 if [ ! -f "$DMG_PATH" ]; then
   echo "DMG not found: $DMG_PATH" >&2

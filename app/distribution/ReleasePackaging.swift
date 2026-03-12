@@ -5,8 +5,8 @@ public enum DistributionDefaults {
     public static let appName = "mvx"
     public static let appBundleName = "mvx.app"
     public static let defaultMinimumMacOS = "13.0"
-    public static let defaultVersion = "0.1.0"
-    public static let defaultBuild = "1"
+    public static let defaultVersion = "0.1.2"
+    public static let defaultBuild = "2"
     public static let defaultDownloadBaseURL = "https://downloads.example.com/mvx"
     public static let defaultAppcastURL = "\(defaultDownloadBaseURL)/appcast.xml"
 }

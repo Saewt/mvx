@@ -10,7 +10,7 @@ public struct ReleasePublicationDescriptor: Equatable {
         artifact: ReleaseArtifactDescriptor,
         sha256: String,
         appcastURLString: String = DistributionDefaults.defaultAppcastURL,
-        homepageURLString: String = "https://github.com/emirekici/mvx"
+        homepageURLString: String = "https://github.com/Saewt/mvx"
     ) {
         self.artifact = artifact
         self.sha256 = sha256.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
