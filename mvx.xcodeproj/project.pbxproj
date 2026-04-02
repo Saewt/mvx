@@ -11,6 +11,7 @@
 		085C25B8A6C7D60D9BFECA2A /* shell-integration in Resources */ = {isa = PBXBuildFile; fileRef = E20A610BE5814C138120B47E /* shell-integration */; };
 		08A05434F1723EE105FF4478 /* MvxApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B765967C82BDD1CBB2FD493C /* MvxApp.swift */; };
 		0D31BA4DF39AF6B5F3045333 /* WorkflowChromeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA2ED6364935BD8A0919354E /* WorkflowChromeTests.swift */; };
+		12E87BD4F377BD61953A6CDF /* agent-helpers in Resources */ = {isa = PBXBuildFile; fileRef = 90EB12DEDFC14229B7B12359 /* agent-helpers */; };
 		146E17A214C5A2DB75ED9664 /* PtyBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59A58728031342A128F19559 /* PtyBridge.swift */; };
 		160BE2CB4988251E4B69FEC0 /* NativeGhosttyNSView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4C96A594EE767A04BBA86DF /* NativeGhosttyNSView.swift */; };
 		17DCFA696F816C20C9E2D70A /* AppDirectories.swift in Sources */ = {isa = PBXBuildFile; fileRef = A37A5B7F457B13C64C286E1F /* AppDirectories.swift */; };
@@ -27,6 +28,7 @@
 		373C7B2CA2B2A939DF0B1237 /* WorkspaceShellScaffold.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2878E56EF252F425A8507A33 /* WorkspaceShellScaffold.swift */; };
 		3A18F5CB4AE45EA2D94BFD0E /* WorkspaceShellLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8293C73F15D27A10AF973F70 /* WorkspaceShellLayoutTests.swift */; };
 		3CD692FBBC152963B3A0DE60 /* SessionCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E13C8D72C94FD521EDC9AC0 /* SessionCommand.swift */; };
+		3E3900BAF5545AEC34787186 /* WorkspaceFileTreeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FF724567849DB4A43307031 /* WorkspaceFileTreeTests.swift */; };
 		3FEC04FB063D425529A512B8 /* Mvx.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = C589C5A2891CD58E9FD7D9B9 /* Mvx.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		3FFB96F55ECB8EA7FAE43AD0 /* SessionGroupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC8CEA1C458E295E189AE608 /* SessionGroupTests.swift */; };
 		4093CE6B500518CD3AF6D83E /* WorkspaceNote.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC958A6ED1EC97D52C5DE773 /* WorkspaceNote.swift */; };
@@ -77,6 +79,7 @@
 		CB263D36506CD63CCA8C09ED /* AppearanceConfigTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 734F9E620236616CF74CFB36 /* AppearanceConfigTests.swift */; };
 		CC4032DA7F3E66816D9BB9A8 /* WorkspaceMetadata.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3164A2630FDF0E7C29A6866 /* WorkspaceMetadata.swift */; };
 		CFECBF1524C91F171C25805A /* ActiveWorkContextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5F5B1AC08644E11DAC8C625 /* ActiveWorkContextView.swift */; };
+		D12697DB94B341EBAAF894EB /* WorkspaceFileTreeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0567E3FC1BEF570C79EFFFF1 /* WorkspaceFileTreeView.swift */; };
 		D190CE0128B7DAC83615E884 /* ReleasePackagingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F91C365080C3AA8ACA717524 /* ReleasePackagingTests.swift */; };
 		D2D8B3D590CFECEDECC5D666 /* TilingWorkspaceLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFAADA2F8669BF44B760E3FB /* TilingWorkspaceLayoutTests.swift */; };
 		D562AA2F4C2E2C766A56C6E4 /* ConfigStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F52862FBCF09D02A6532388 /* ConfigStore.swift */; };
@@ -137,12 +140,14 @@
 
 /* Begin PBXFileReference section */
 		03830ABD1DD874362AD1D64F /* NativeGhosttySessionDriver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeGhosttySessionDriver.swift; sourceTree = "<group>"; };
+		0567E3FC1BEF570C79EFFFF1 /* WorkspaceFileTreeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceFileTreeView.swift; sourceTree = "<group>"; };
 		0FFA3E253D2E2D7412FCF39C /* WorkspaceCommandHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceCommandHandler.swift; sourceTree = "<group>"; };
 		10CBFF5A0A30E50DF0D936FC /* ReleasePackaging.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReleasePackaging.swift; sourceTree = "<group>"; };
 		12D8E55435E392F0D061E35D /* GhosttySupportPaths.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhosttySupportPaths.swift; sourceTree = "<group>"; };
 		17A70F395624411CD87DC5FF /* WorkspaceAutosaveController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceAutosaveController.swift; sourceTree = "<group>"; };
 		19961297C89A03F026C77242 /* ghostty */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ghostty; path = vendor/ghostty/resources/ghostty; sourceTree = SOURCE_ROOT; };
 		1EA048007D0D8EDA21FD6B60 /* SessionSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionSidebarView.swift; sourceTree = "<group>"; };
+		1FF724567849DB4A43307031 /* WorkspaceFileTreeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceFileTreeTests.swift; sourceTree = "<group>"; };
 		201191FA321D056C9EDC3765 /* TerminalProbeRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalProbeRunner.swift; sourceTree = "<group>"; };
 		20A344D1CC2BA2B16B313621 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		21DAD4974C8D68F8316D4011 /* GhosttyKit.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = GhosttyKit.xcframework; path = vendor/ghostty/GhosttyKit.xcframework; sourceTree = "<group>"; };
@@ -180,9 +185,11 @@
 		86EF2E792B43519D5F2F30BB /* TerminalBackendKind.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalBackendKind.swift; sourceTree = "<group>"; };
 		8D0A6248B005A473CED163AB /* PaneDividerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaneDividerView.swift; sourceTree = "<group>"; };
 		8D0B0D8603D0503210786DB8 /* WorkspaceModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceModelTests.swift; sourceTree = "<group>"; };
+		90EB12DEDFC14229B7B12359 /* agent-helpers */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "agent-helpers"; path = "app/launcher/resources/agent-helpers"; sourceTree = SOURCE_ROOT; };
 		93D7CB31B7AB94311E5AC31B /* SessionGroupHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionGroupHeaderView.swift; sourceTree = "<group>"; };
 		9D713662FECB4E3A3C0CAEF4 /* WorkspaceNotesCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceNotesCardView.swift; sourceTree = "<group>"; };
 		A37A5B7F457B13C64C286E1F /* AppDirectories.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDirectories.swift; sourceTree = "<group>"; };
+		A62C5AC33864F711CF5213E4 /* mvx-wrap-agent */ = {isa = PBXFileReference; path = "mvx-wrap-agent"; sourceTree = "<group>"; };
 		AC8CEA1C458E295E189AE608 /* SessionGroupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionGroupTests.swift; sourceTree = "<group>"; };
 		AC958A6ED1EC97D52C5DE773 /* WorkspaceNote.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceNote.swift; sourceTree = "<group>"; };
 		B2DEE5F608D9D0FC6FC8EF48 /* TerminalSessionDriver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalSessionDriver.swift; sourceTree = "<group>"; };
@@ -220,6 +227,7 @@
 		F91C365080C3AA8ACA717524 /* ReleasePackagingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReleasePackagingTests.swift; sourceTree = "<group>"; };
 		F9FE3BF3B4DE368FA61BE8DD /* DistributionChannelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DistributionChannelTests.swift; sourceTree = "<group>"; };
 		FCF1322C7F3D2D011E7B3A44 /* SessionGroup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionGroup.swift; sourceTree = "<group>"; };
+		FE958F7B208D25B10AE6EACB /* mvx-agent-status */ = {isa = PBXFileReference; path = "mvx-agent-status"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -263,6 +271,7 @@
 				B51C44A340166C763E804750 /* SessionTabRowView.swift */,
 				30C2F2FEB4552DE021B34513 /* TerminalHostFactory.swift */,
 				E918FC115E4AC9EFA74C6FF0 /* TilingWorkspaceView.swift */,
+				0567E3FC1BEF570C79EFFFF1 /* WorkspaceFileTreeView.swift */,
 				9D713662FECB4E3A3C0CAEF4 /* WorkspaceNotesCardView.swift */,
 				2878E56EF252F425A8507A33 /* WorkspaceShellScaffold.swift */,
 			);
@@ -278,6 +287,15 @@
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
+		61A034CA67D596437B074175 /* agent-helpers */ = {
+			isa = PBXGroup;
+			children = (
+				FE958F7B208D25B10AE6EACB /* mvx-agent-status */,
+				A62C5AC33864F711CF5213E4 /* mvx-wrap-agent */,
+			);
+			path = "agent-helpers";
+			sourceTree = "<group>";
+		};
 		785BF872C2C1166812B4AE29 /* app */ = {
 			isa = PBXGroup;
 			children = (
@@ -290,6 +308,14 @@
 				533C2AC74D49D6A7D47BCE67 /* ui */,
 			);
 			path = app;
+			sourceTree = "<group>";
+		};
+		78F2B317206ADBC85C6F72C8 /* resources */ = {
+			isa = PBXGroup;
+			children = (
+				61A034CA67D596437B074175 /* agent-helpers */,
+			);
+			path = resources;
 			sourceTree = "<group>";
 		};
 		9034FD252157E9F5A48CBE8C /* Products */ = {
@@ -324,6 +350,7 @@
 				BA2ED6364935BD8A0919354E /* WorkflowChromeTests.swift */,
 				2EE746688CB2AFFB9DD1F76D /* WorkspaceAutosaveControllerTests.swift */,
 				E30F685A2BC2D34E6F75B6FE /* WorkspaceCommandHandlerTests.swift */,
+				1FF724567849DB4A43307031 /* WorkspaceFileTreeTests.swift */,
 				8D0B0D8603D0503210786DB8 /* WorkspaceModelTests.swift */,
 				CDCDFF0D2C519CC93D668F48 /* WorkspaceNotesCardTests.swift */,
 				361CE7528E1D603C273024C9 /* WorkspacePanePersistenceTests.swift */,
@@ -369,6 +396,7 @@
 			children = (
 				236BEF60321496E23132387C /* MvxLauncher.swift */,
 				F4F13E1F93C31AA19FB541AE /* native_terminal */,
+				78F2B317206ADBC85C6F72C8 /* resources */,
 			);
 			name = launcher;
 			path = app/launcher;
@@ -419,6 +447,7 @@
 		CD594177972A08EA60F34354 = {
 			isa = PBXGroup;
 			children = (
+				90EB12DEDFC14229B7B12359 /* agent-helpers */,
 				19961297C89A03F026C77242 /* ghostty */,
 				E20A610BE5814C138120B47E /* shell-integration */,
 				423EB637C483155CC8235E4C /* terminfo */,
@@ -553,6 +582,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				DF4DAE4A1DD9C087A328B62F /* Assets.xcassets in Resources */,
+				12E87BD4F377BD61953A6CDF /* agent-helpers in Resources */,
 				B81AFA0A17141B0F331F91A4 /* ghostty in Resources */,
 				085C25B8A6C7D60D9BFECA2A /* shell-integration in Resources */,
 				C98D04BE29C48541C33A29C0 /* terminfo in Resources */,
@@ -586,6 +616,7 @@
 				0D31BA4DF39AF6B5F3045333 /* WorkflowChromeTests.swift in Sources */,
 				3603CAB40F811DB59860CB5E /* WorkspaceAutosaveControllerTests.swift in Sources */,
 				BB3A6AA0E2047A0AB8D2113B /* WorkspaceCommandHandlerTests.swift in Sources */,
+				3E3900BAF5545AEC34787186 /* WorkspaceFileTreeTests.swift in Sources */,
 				46D592A7A7E1C1653BFC9BB7 /* WorkspaceModelTests.swift in Sources */,
 				75ED46B054D2A430A8EE8A40 /* WorkspaceNotesCardTests.swift in Sources */,
 				6EC1C8A05230A4F744754831 /* WorkspacePanePersistenceTests.swift in Sources */,
@@ -646,6 +677,7 @@
 				8E6ED5CE472C1107E28D3932 /* TilingWorkspaceView.swift in Sources */,
 				8920B37E8E62EDECE245D87F /* WorkspaceAutosaveController.swift in Sources */,
 				920141DA5454F2A8C6F47B09 /* WorkspaceCommandHandler.swift in Sources */,
+				D12697DB94B341EBAAF894EB /* WorkspaceFileTreeView.swift in Sources */,
 				6C6533D58012F7DA61B7B035 /* WorkspaceGraph.swift in Sources */,
 				CC4032DA7F3E66816D9BB9A8 /* WorkspaceMetadata.swift in Sources */,
 				4093CE6B500518CD3AF6D83E /* WorkspaceNote.swift in Sources */,

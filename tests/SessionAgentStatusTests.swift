@@ -63,6 +63,32 @@ final class SessionAgentStatusTests: XCTestCase {
         XCTAssertTrue(session.currentPromptVisible())
     }
 
+    func testNotificationFormatParsesAllStates() {
+        let prefix = "mvx-agent-status:"
+        let cases: [(String, SessionAgentStatus)] = [
+            ("mvx-agent-status:running", .running),
+            ("mvx-agent-status:waiting", .waiting),
+            ("mvx-agent-status:done", .done),
+            ("mvx-agent-status:error", .error),
+        ]
+
+        for (text, expected) in cases {
+            XCTAssertTrue(text.hasPrefix(prefix))
+            let stateValue = String(text.dropFirst(prefix.count))
+            let status = SessionAgentStatus(rawValue: stateValue)
+            XCTAssertEqual(status, expected, "Failed for: \(text)")
+
+            if let status {
+                let update = SessionAgentStatusUpdate(status: status)
+                XCTAssertEqual(SessionAgentStatusUpdate.parse(update.payload)?.status, expected)
+            }
+        }
+
+        // Invalid prefix should not parse
+        XCTAssertNil(SessionAgentStatus(rawValue: "mvx-agent-status:running"))
+        XCTAssertNil(SessionAgentStatus(rawValue: ""))
+    }
+
     func testWrapperCommandTransitionsToDone() {
         let session = makeTestSession()
         let driver = session.backendObject as? InMemoryTestTerminalDriver

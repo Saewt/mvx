@@ -53,6 +53,7 @@ public struct SessionSidebarView: View {
     @ObservedObject private var commandHandler: WorkspaceCommandHandler
     var registry: WorkspaceRegistry?
     private let onCollapse: (() -> Void)?
+    @StateObject private var fileTreeController: WorkspaceFileTreeController
     @State private var pendingRenameGroupID: UUID?
 
     public init(
@@ -65,6 +66,9 @@ public struct SessionSidebarView: View {
         self.commandHandler = commandHandler
         self.registry = registry
         self.onCollapse = onCollapse
+        _fileTreeController = StateObject(
+            wrappedValue: WorkspaceFileTreeController(workspace: workspace)
+        )
     }
 
     public var body: some View {
@@ -122,6 +126,11 @@ public struct SessionSidebarView: View {
                     .fill(Color.white.opacity(0.04))
             )
 
+            WorkspaceFileTreeSectionView(
+                controller: fileTreeController,
+                workspace: workspace
+            )
+
             VStack(alignment: .leading, spacing: 4) {
                 Text(chrome.activeSessionTitle ?? "Sessions")
                     .font(.system(.headline, design: .rounded))
@@ -146,6 +155,17 @@ public struct SessionSidebarView: View {
         .padding(.bottom, 12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(Color(red: 0.09, green: 0.10, blue: 0.13))
+        .onAppear {
+            fileTreeController.bind(to: workspace)
+            _ = fileTreeController.syncFromWorkspace()
+        }
+        .onChange(of: workspace.activeSessionID) { _ in
+            fileTreeController.bind(to: workspace)
+            _ = fileTreeController.syncFromWorkspace()
+        }
+        .onChange(of: workspace.activeDescriptor?.workingDirectoryPath) { _ in
+            _ = fileTreeController.syncFromWorkspace()
+        }
     }
 
     @ViewBuilder

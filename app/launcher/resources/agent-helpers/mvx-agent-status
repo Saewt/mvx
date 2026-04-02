@@ -14,7 +14,7 @@ case "$1" in
         ;;
 esac
 
-# OSC 9 — intercepted by Ghostty action callback
+# OSC 9 - intercepted by Ghostty action callback
 printf '\033]9;mvx-agent-status:%s\007' "$1"
-# OSC 7777 — parsed by PtyBridge for fallback backend
+# OSC 7777 - parsed by PtyBridge for fallback backend
 printf '\033]7777;state=%s\007' "$1"

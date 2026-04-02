@@ -43,6 +43,10 @@ final class NativeGhosttySessionDriver: TerminalSessionDriver {
             self?.notifyRuntimeEventObservers(event)
             self?.notifyActivityObservers()
         }
+
+        surfaceRuntime.onAgentStatusReceived = { [weak self] update in
+            _ = self?.processAgentStatusEscapeSequence(update.payload)
+        }
     }
 
     func start() {

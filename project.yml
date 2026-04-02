@@ -27,6 +27,8 @@ targets:
     sources:
       - path: app/launcher
       - path: app/assets/Assets.xcassets
+      - path: app/launcher/resources/agent-helpers
+        type: folder
       - path: vendor/ghostty/resources/ghostty
         type: folder
       - path: vendor/ghostty/resources/terminfo

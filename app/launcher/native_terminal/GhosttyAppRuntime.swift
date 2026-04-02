@@ -1,8 +1,14 @@
 import AppKit
 import Foundation
+import Mvx
 
 final class GhosttyAppRuntime {
     static let shared = GhosttyAppRuntime()
+
+    private static let embeddedConfigFileName = "ghostty-embedded.conf"
+    private static let optionAsAltConfigKey = "macos-option-as-alt"
+    private static let embeddedConfigContents = "macos-option-as-alt = false\n"
+    private static let agentHelpersEnvironmentKey = "MVX_AGENT_HELPERS_DIR"
 
     private(set) var isAvailable = false
     private(set) var initializationError: String?
@@ -48,8 +54,7 @@ final class GhosttyAppRuntime {
             return
         }
 
-        ghostty_config_load_default_files(primaryConfig)
-        ghostty_config_finalize(primaryConfig)
+        prepareConfig(primaryConfig, loadDefaultFiles: true)
 
         var runtimeConfig = ghostty_runtime_config_s()
         runtimeConfig.userdata = Unmanaged.passUnretained(self).toOpaque()
@@ -102,7 +107,7 @@ final class GhosttyAppRuntime {
             return
         }
 
-        ghostty_config_finalize(fallbackConfig)
+        prepareConfig(fallbackConfig, loadDefaultFiles: false)
 
         if let createdApp = ghostty_app_new(&runtimeConfig, fallbackConfig) {
             app = createdApp
@@ -155,6 +160,7 @@ final class GhosttyAppRuntime {
     private func configureProcessEnvironment(supportPaths: GhosttySupportPaths) {
         unsetenv("NO_COLOR")
         setenv("GHOSTTY_RESOURCES_DIR", supportPaths.resourcesRoot.path, 1)
+        setenv(Self.agentHelpersEnvironmentKey, supportPaths.agentHelpersRoot.path, 1)
         setenv("TERM", "xterm-ghostty", 1)
         setenv("TERM_PROGRAM", "ghostty", 1)
 
@@ -184,6 +190,75 @@ final class GhosttyAppRuntime {
         }
 
         return ([component] + parts).joined(separator: ":")
+    }
+
+    private func prepareConfig(_ config: ghostty_config_t, loadDefaultFiles: Bool) {
+        if loadDefaultFiles {
+            ghostty_config_load_default_files(config)
+        }
+
+        loadEmbeddedConfigOverride(into: config)
+        ghostty_config_finalize(config)
+        verifyEmbeddedOptionKeyOverride(in: config)
+    }
+
+    private func loadEmbeddedConfigOverride(into config: ghostty_config_t) {
+        do {
+            let overrideURL = try embeddedConfigOverrideURL()
+            overrideURL.path.withCString { path in
+                ghostty_config_load_file(config, path)
+            }
+        } catch {
+            NSLog("Failed to write embedded Ghostty config override: %@", error.localizedDescription)
+        }
+    }
+
+    private func embeddedConfigOverrideURL(
+        fileManager: FileManager = .default
+    ) throws -> URL {
+        let appDirectory = AppDirectories.appDirectory()
+        try fileManager.createDirectory(at: appDirectory, withIntermediateDirectories: true)
+
+        let configURL = appDirectory.appendingPathComponent(
+            Self.embeddedConfigFileName,
+            isDirectory: false
+        )
+        let existingContents = try? String(contentsOf: configURL, encoding: .utf8)
+        if existingContents != Self.embeddedConfigContents {
+            try Self.embeddedConfigContents.write(
+                to: configURL,
+                atomically: true,
+                encoding: .utf8
+            )
+        }
+
+        return configURL
+    }
+
+    private func verifyEmbeddedOptionKeyOverride(in config: ghostty_config_t) {
+        var resolvedValue: UnsafePointer<CChar>?
+        let didLoadOverride = Self.optionAsAltConfigKey.withCString { key in
+            ghostty_config_get(
+                config,
+                &resolvedValue,
+                key,
+                UInt(Self.optionAsAltConfigKey.utf8.count)
+            )
+        }
+
+        guard didLoadOverride,
+              let resolvedValue else {
+            return
+        }
+
+        let value = String(cString: resolvedValue)
+        if value != "false" {
+            NSLog(
+                "Embedded Ghostty config override expected %@=false, resolved %@",
+                Self.optionAsAltConfigKey,
+                value
+            )
+        }
     }
 
     private func updateAppFocus() {

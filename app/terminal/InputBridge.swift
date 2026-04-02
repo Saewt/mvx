@@ -29,6 +29,47 @@ public enum TerminalKeyFallback {
     }
 }
 
+public enum TerminalKeyEquivalentDisposition: Equatable {
+    case allowSystemHandling
+    case deferToTextInput
+    case sendRawToTerminal
+}
+
+public struct TerminalKeyEquivalentPolicy {
+    public struct Modifiers: OptionSet, Equatable, Hashable, Sendable {
+        public let rawValue: Int
+
+        public init(rawValue: Int) {
+            self.rawValue = rawValue
+        }
+
+        public static let shift = Modifiers(rawValue: 1 << 0)
+        public static let control = Modifiers(rawValue: 1 << 1)
+        public static let option = Modifiers(rawValue: 1 << 2)
+        public static let command = Modifiers(rawValue: 1 << 3)
+    }
+
+    public static func disposition(
+        modifiers: Modifiers,
+        characters: String?,
+        charactersIgnoringModifiers: String?
+    ) -> TerminalKeyEquivalentDisposition {
+        if modifiers == [.command],
+           charactersIgnoringModifiers?.lowercased() == "q" {
+            return .allowSystemHandling
+        }
+
+        if modifiers.contains(.option),
+           !modifiers.contains(.command),
+           !modifiers.contains(.control),
+           TerminalKeyFallback.fallbackText(for: characters) != nil {
+            return .deferToTextInput
+        }
+
+        return .sendRawToTerminal
+    }
+}
+
 public struct KeyboardDispatch: Equatable {
     public let bytes: [UInt8]
     public let clipboardAction: ClipboardShortcutAction?

@@ -24,6 +24,7 @@ final class GhosttySurfaceRuntime {
     private weak var session: TerminalSession?
     private let renderView = NSView(frame: .zero)
     private var runtimeEventObservers: [UUID: (SessionRuntimeEvent) -> Void] = [:]
+    var onAgentStatusReceived: ((SessionAgentStatusUpdate) -> Void)?
     private var surface: ghostty_surface_t?
     private var didRequestStart = false
     private var lastDisplayID: UInt32 = 0
@@ -456,6 +457,20 @@ final class GhosttySurfaceRuntime {
             let axis: WorkspaceSplitAxis = Self.splitAxis(from: action.action.new_split)
             notifyRuntimeEventObservers(.splitRequested(axis))
             return true
+        case GHOSTTY_ACTION_DESKTOP_NOTIFICATION:
+            let title = Self.optionalString(action.action.desktop_notification.title)
+            let body = Self.optionalString(action.action.desktop_notification.body)
+            let text = body ?? title ?? ""
+            let prefix = "mvx-agent-status:"
+            if text.hasPrefix(prefix) {
+                let stateValue = String(text.dropFirst(prefix.count))
+                if let status = SessionAgentStatus(rawValue: stateValue) {
+                    let update = SessionAgentStatusUpdate(status: status)
+                    onAgentStatusReceived?(update)
+                    return true
+                }
+            }
+            return false
         case GHOSTTY_ACTION_OPEN_URL:
             if let url = Self.url(from: action.action.open_url) {
                 NSWorkspace.shared.open(url)
@@ -737,18 +752,35 @@ final class GhosttySurfaceRuntime {
             action = event.isARepeat ? GHOSTTY_ACTION_REPEAT : GHOSTTY_ACTION_PRESS
         }
 
-        let unshifted = event.charactersIgnoringModifiers?.unicodeScalars.first?.value ?? 0
         let modifiers = Self.modifiers(from: event.modifierFlags)
+        let translationModifiers = translatedModifierFlags(for: event)
 
         return ghostty_input_key_s(
             action: action,
             mods: modifiers,
-            consumed_mods: GHOSTTY_MODS_NONE,
+            consumed_mods: Self.consumedModifiers(from: translationModifiers),
             keycode: UInt32(event.keyCode),
             text: text,
-            unshifted_codepoint: UInt32(unshifted),
+            unshifted_codepoint: Self.unshiftedCodepoint(from: event),
             composing: composing
         )
+    }
+
+    private func translatedModifierFlags(for event: NSEvent) -> NSEvent.ModifierFlags {
+        guard let surface else {
+            return event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        }
+
+        let rawModifiers = Self.modifiers(from: event.modifierFlags)
+        let translatedModifiers = ghostty_surface_key_translation_mods(surface, rawModifiers)
+        var flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+
+        Self.applyTranslatedFlag(.shift, ghosttyFlag: GHOSTTY_MODS_SHIFT, translatedModifiers, to: &flags)
+        Self.applyTranslatedFlag(.control, ghosttyFlag: GHOSTTY_MODS_CTRL, translatedModifiers, to: &flags)
+        Self.applyTranslatedFlag(.option, ghosttyFlag: GHOSTTY_MODS_ALT, translatedModifiers, to: &flags)
+        Self.applyTranslatedFlag(.command, ghosttyFlag: GHOSTTY_MODS_SUPER, translatedModifiers, to: &flags)
+
+        return flags
     }
 
     private static func displayID(for screen: NSScreen?) -> UInt32? {
@@ -815,6 +847,19 @@ final class GhosttySurfaceRuntime {
         }
     }
 
+    private static func applyTranslatedFlag(
+        _ flag: NSEvent.ModifierFlags,
+        ghosttyFlag: ghostty_input_mods_e,
+        _ translatedModifiers: ghostty_input_mods_e,
+        to flags: inout NSEvent.ModifierFlags
+    ) {
+        if (translatedModifiers.rawValue & ghosttyFlag.rawValue) != 0 {
+            flags.insert(flag)
+        } else {
+            flags.remove(flag)
+        }
+    }
+
     private static func modifiers(from flags: NSEvent.ModifierFlags) -> ghostty_input_mods_e {
         var modifiers = GHOSTTY_MODS_NONE.rawValue
         if flags.contains(.shift) {
@@ -836,6 +881,26 @@ final class GhosttySurfaceRuntime {
             modifiers |= GHOSTTY_MODS_NUM.rawValue
         }
         return ghostty_input_mods_e(modifiers)
+    }
+
+    private static func consumedModifiers(from flags: NSEvent.ModifierFlags) -> ghostty_input_mods_e {
+        var modifiers = GHOSTTY_MODS_NONE.rawValue
+        if flags.contains(.shift) {
+            modifiers |= GHOSTTY_MODS_SHIFT.rawValue
+        }
+        if flags.contains(.option) {
+            modifiers |= GHOSTTY_MODS_ALT.rawValue
+        }
+        return ghostty_input_mods_e(modifiers)
+    }
+
+    private static func unshiftedCodepoint(from event: NSEvent) -> UInt32 {
+        guard let characters = event.characters(byApplyingModifiers: []),
+              let scalar = characters.unicodeScalars.first else {
+            return 0
+        }
+
+        return UInt32(scalar.value)
     }
 
     private static func scrollPayload(

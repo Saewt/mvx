@@ -183,9 +183,13 @@ final class NativeGhosttyNSView: NSView {
             return false
         }
 
-        // Cmd+Q is a system-level app quit — never consume it in the terminal
-        if event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
-           event.charactersIgnoringModifiers == "q" {
+        let disposition = TerminalKeyEquivalentPolicy.disposition(
+            modifiers: .init(event.modifierFlags),
+            characters: event.characters,
+            charactersIgnoringModifiers: event.charactersIgnoringModifiers
+        )
+
+        if disposition != .sendRawToTerminal {
             return false
         }
 
@@ -380,6 +384,26 @@ final class NativeGhosttyNSView: NSView {
         runtime?.reassertDisplayID()
         _ = reconcileGeometryNow(forceRefresh: true)
         NativeGhosttyGeometryCoordinator.shared.scheduleGeometryReconcile(forceRefresh: true)
+    }
+}
+
+private extension TerminalKeyEquivalentPolicy.Modifiers {
+    init(_ flags: NSEvent.ModifierFlags) {
+        self = []
+
+        let normalized = flags.intersection(.deviceIndependentFlagsMask)
+        if normalized.contains(.shift) {
+            insert(.shift)
+        }
+        if normalized.contains(.control) {
+            insert(.control)
+        }
+        if normalized.contains(.option) {
+            insert(.option)
+        }
+        if normalized.contains(.command) {
+            insert(.command)
+        }
     }
 }
 

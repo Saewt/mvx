@@ -25,6 +25,8 @@ public enum PtyTransport: String, Codable, Equatable {
 
 public final class PtyBridge {
     private static let maxProtocolLogEntries = 500
+    static let agentHelpersEnvironmentKey = "MVX_AGENT_HELPERS_DIR"
+    private static let agentHelperCommandNames = ["mvx-agent-status", "mvx-wrap-agent"]
 
     public let shellPath: String
     public let prompt: String
@@ -285,12 +287,15 @@ public final class PtyBridge {
 
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true, attributes: nil)
-            let bootstrap = """
-            unsetopt PROMPT_PERCENT
-            PROMPT_EOL_MARK=''
-            PROMPT='\(shellQuoted(prompt))'
-            PS1='\(shellQuoted(prompt))'
-            """
+            let commandDirectory = Self.prepareAgentHelperLaunchersIfNeeded(
+                runtimeDirectory: directory,
+                environment: ProcessInfo.processInfo.environment,
+                fileManager: .default
+            )
+            let bootstrap = Self.bootstrapConfiguration(
+                prompt: prompt,
+                commandDirectory: commandDirectory
+            )
             try bootstrap.write(to: directory.appendingPathComponent(".zshrc"), atomically: true, encoding: .utf8)
             return directory
         } catch {
@@ -445,7 +450,85 @@ public final class PtyBridge {
         isRunning = false
     }
 
-    private func shellQuoted(_ text: String) -> String {
+    static func resolveAgentHelpersDirectory(
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        fileManager: FileManager = .default
+    ) -> URL? {
+        guard let rawPath = environment[agentHelpersEnvironmentKey]?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+              !rawPath.isEmpty else {
+            return nil
+        }
+
+        let directory = URL(fileURLWithPath: rawPath, isDirectory: true).standardizedFileURL
+        var isDirectory: ObjCBool = false
+        guard fileManager.fileExists(atPath: directory.path, isDirectory: &isDirectory), isDirectory.boolValue else {
+            return nil
+        }
+
+        return directory
+    }
+
+    static func bootstrapConfiguration(prompt: String, commandDirectory: URL?) -> String {
+        var lines = [
+            "unsetopt PROMPT_PERCENT",
+            "PROMPT_EOL_MARK=''",
+            "PROMPT='\(shellQuoted(prompt))'",
+            "PS1='\(shellQuoted(prompt))'",
+        ]
+
+        if let commandDirectory {
+            lines.append("export PATH='\(shellQuoted(commandDirectory.path))':\"$PATH\"")
+        }
+
+        return lines.joined(separator: "\n") + "\n"
+    }
+
+    @discardableResult
+    static func installAgentHelperLaunchers(
+        in runtimeDirectory: URL,
+        agentHelpersDirectory: URL,
+        fileManager: FileManager = .default
+    ) throws -> [URL] {
+        try agentHelperCommandNames.map { commandName in
+            let launcherURL = runtimeDirectory.appendingPathComponent(commandName)
+            let targetURL = agentHelpersDirectory.appendingPathComponent(commandName)
+            let contents = """
+            #!/bin/sh
+            exec /bin/sh '\(shellQuoted(targetURL.path))' "$@"
+            """
+
+            try contents.write(to: launcherURL, atomically: true, encoding: .utf8)
+            try fileManager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: launcherURL.path)
+            return launcherURL
+        }
+    }
+
+    private static func prepareAgentHelperLaunchersIfNeeded(
+        runtimeDirectory: URL,
+        environment: [String: String],
+        fileManager: FileManager
+    ) -> URL? {
+        guard let agentHelpersDirectory = resolveAgentHelpersDirectory(
+            environment: environment,
+            fileManager: fileManager
+        ) else {
+            return nil
+        }
+
+        do {
+            _ = try installAgentHelperLaunchers(
+                in: runtimeDirectory,
+                agentHelpersDirectory: agentHelpersDirectory,
+                fileManager: fileManager
+            )
+            return runtimeDirectory
+        } catch {
+            return nil
+        }
+    }
+
+    private static func shellQuoted(_ text: String) -> String {
         text.replacingOccurrences(of: "'", with: "'\\''")
     }
 
