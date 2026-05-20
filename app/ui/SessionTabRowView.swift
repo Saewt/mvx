@@ -318,6 +318,7 @@ public struct SessionTabRowView: View {
     private let descriptor: SessionDescriptor
     private let isFocusedInTiling: Bool
     private let gitChangeSummary: WorkspaceGitChangeSummary?
+    private let durationReferenceDate: Date
 
     @State private var renameController = SessionTabRenameController()
 
@@ -325,12 +326,14 @@ public struct SessionTabRowView: View {
         workspace: SessionWorkspace,
         descriptor: SessionDescriptor,
         isFocusedInTiling: Bool = false,
-        gitChangeSummary: WorkspaceGitChangeSummary? = nil
+        gitChangeSummary: WorkspaceGitChangeSummary? = nil,
+        durationReferenceDate: Date = Date()
     ) {
         self.workspace = workspace
         self.descriptor = descriptor
         self.isFocusedInTiling = isFocusedInTiling
         self.gitChangeSummary = gitChangeSummary
+        self.durationReferenceDate = durationReferenceDate
     }
 
     public var body: some View {
@@ -364,19 +367,17 @@ public struct SessionTabRowView: View {
                         .lineLimit(1)
 
                     if let sessionStartedAt = workspace.sessionStartedAt(for: descriptor.id) {
-                        TimelineView(.periodic(from: sessionStartedAt, by: 60)) { context in
-                            let durationState = SessionTabDurationState.resolve(
-                                startedAt: sessionStartedAt,
-                                isRenaming: renameController.isRenaming,
-                                referenceDate: context.date
-                            )
+                        let durationState = SessionTabDurationState.resolve(
+                            startedAt: sessionStartedAt,
+                            isRenaming: renameController.isRenaming,
+                            referenceDate: durationReferenceDate
+                        )
 
-                            if let label = durationState.label {
-                                Text(label)
-                                    .font(.system(.caption2, design: .monospaced).weight(.medium))
-                                    .foregroundStyle(.secondary)
-                                    .fixedSize(horizontal: true, vertical: false)
-                            }
+                        if let label = durationState.label {
+                            Text(label)
+                                .font(.system(.caption2, design: .monospaced).weight(.medium))
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: true, vertical: false)
                         }
                     }
                 }

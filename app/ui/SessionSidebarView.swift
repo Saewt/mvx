@@ -55,6 +55,9 @@ public struct SessionSidebarView: View {
     private let onCollapse: (() -> Void)?
     @StateObject private var fileTreeController: WorkspaceFileTreeController
     @State private var pendingRenameGroupID: UUID?
+    @State private var pendingRenameWorkspaceID: UUID?
+    @State private var workspaceRenameController = SessionTabRenameController()
+    @State private var durationReferenceDate = Date()
 
     public init(
         workspace: SessionWorkspace,
@@ -82,6 +85,8 @@ public struct SessionSidebarView: View {
                     .font(.system(.caption, design: .monospaced).weight(.heavy))
                     .tracking(4)
                     .foregroundStyle(.secondary)
+                    .layoutPriority(1)
+                    .fixedSize()
 
                 Spacer()
 
@@ -101,7 +106,7 @@ public struct SessionSidebarView: View {
             }
             .padding(.top, 10)
 
-            if let registry, !registry.entries.isEmpty {
+            if let registry {
                 workspaceSwitcher(registry: registry)
             }
 
@@ -166,99 +171,160 @@ public struct SessionSidebarView: View {
         .onChange(of: workspace.activeDescriptor?.workingDirectoryPath) { _ in
             _ = fileTreeController.syncFromWorkspace()
         }
+        .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) { _ in
+            durationReferenceDate = Date()
+        }
     }
 
     @ViewBuilder
     private func workspaceSwitcher(registry: WorkspaceRegistry) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Workspaces")
-                .font(.system(.caption, design: .rounded))
-                .foregroundStyle(.secondary)
+            HStack(spacing: 8) {
+                Text("Workspaces")
+                    .font(.system(.caption, design: .rounded))
+                    .foregroundStyle(.secondary)
+
+                Spacer(minLength: 0)
+
+                chromeButton(symbolName: "plus", tooltip: "New Workspace") {
+                    createWorkspace(in: registry)
+                }
+                .accessibilityLabel("New Workspace")
+            }
 
             ForEach(registry.entries) { entry in
                 let isActive = registry.activeWorkspaceID == entry.id
                 let metadata = registry.cardMetadata(for: entry.id)
+                let isRenaming = pendingRenameWorkspaceID == entry.id && workspaceRenameController.isRenaming
                 let visualState = WorkspaceCardVisualState.resolve(
                     isActive: isActive,
                     metadata: metadata
                 )
                 let glowColor = workspaceCardGlowColor(for: visualState)
 
-                Button {
-                    _ = registry.activateWorkspace(id: entry.id)
-                } label: {
-                    VStack(alignment: .leading, spacing: 7) {
-                        HStack(spacing: 8) {
-                            Capsule(style: .continuous)
-                                .fill(isActive ? Color.accentColor : Color.gray.opacity(0.35))
-                                .frame(width: isActive ? 14 : 8, height: 5)
+                VStack(alignment: .leading, spacing: 7) {
+                    HStack(spacing: 8) {
+                        Capsule(style: .continuous)
+                            .fill(isActive ? Color.accentColor : Color.gray.opacity(0.35))
+                            .frame(width: isActive ? 14 : 8, height: 5)
 
+                        if isRenaming {
+                            SessionInlineRenameField(
+                                text: Binding(
+                                    get: { workspaceRenameController.draftTitle },
+                                    set: { workspaceRenameController.updateDraft($0) }
+                                ),
+                                activationID: workspaceRenameController.activationID,
+                                selectionBehavior: workspaceRenameController.selectionBehavior,
+                                onCommit: { commitWorkspaceRename(entry: entry, registry: registry) },
+                                onCancel: cancelWorkspaceRename
+                            )
+                        } else {
                             Text(metadata?.name ?? entry.name)
                                 .font(.system(.subheadline, design: .rounded).weight(.semibold))
                                 .lineLimit(1)
-
-                            Spacer(minLength: 0)
-
-                            if let metadata {
-                                workspaceMetricBadge(
-                                    "\(metadata.paneCount) pane\(metadata.paneCount == 1 ? "" : "s")"
-                                )
-                            }
                         }
 
-                        Text(metadata?.branchName ?? "No Branch")
-                            .font(.system(.caption, design: .monospaced))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
+                        Spacer(minLength: 0)
 
-                        HStack(spacing: 8) {
-                            if let addedCount = metadata?.gitAddedCount,
-                               let removedCount = metadata?.gitRemovedCount {
-                                Text("+\(addedCount)")
-                                    .font(.system(.caption2, design: .monospaced).weight(.semibold))
-                                    .foregroundStyle(.green)
-
-                                Text("-\(removedCount)")
-                                    .font(.system(.caption2, design: .monospaced).weight(.semibold))
-                                    .foregroundStyle(.red)
-                            }
-
-                            Spacer(minLength: 0)
-
-                            if let metadata, metadata.notificationCount > 0 {
-                                workspaceMetricBadge(
-                                    "\(metadata.notificationCount) alert\(metadata.notificationCount == 1 ? "" : "s")"
-                                )
-                            }
+                        if let metadata {
+                            workspaceMetricBadge(
+                                "\(metadata.paneCount) pane\(metadata.paneCount == 1 ? "" : "s")"
+                            )
                         }
                     }
-                    .padding(.vertical, 9)
-                    .padding(.horizontal, 10)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(
-                                isActive
-                                    ? Color.accentColor.opacity(visualState.backgroundOpacity)
-                                    : Color.white.opacity(visualState.backgroundOpacity)
+
+                    if let metadata {
+                        Text("\(metadata.sessionCount) session\(metadata.sessionCount == 1 ? "" : "s") · \(metadata.groupCount) group\(metadata.groupCount == 1 ? "" : "s") · \(metadata.paneCount) pane\(metadata.paneCount == 1 ? "" : "s")")
+                            .font(.system(.caption2, design: .rounded))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+
+                    Text(metadata?.branchName ?? "No Branch")
+                        .font(.system(.caption, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+
+                    HStack(spacing: 8) {
+                        if let addedCount = metadata?.gitAddedCount,
+                           let removedCount = metadata?.gitRemovedCount {
+                            Text("+\(addedCount)")
+                                .font(.system(.caption2, design: .monospaced).weight(.semibold))
+                                .foregroundStyle(.green)
+
+                            Text("-\(removedCount)")
+                                .font(.system(.caption2, design: .monospaced).weight(.semibold))
+                                .foregroundStyle(.red)
+                        }
+
+                        if let metadata, metadata.waitingCount > 0 {
+                            workspaceMetricBadge("\(metadata.waitingCount) waiting")
+                        }
+
+                        if let metadata, metadata.errorCount > 0 {
+                            workspaceMetricBadge("\(metadata.errorCount) error\(metadata.errorCount == 1 ? "" : "s")")
+                        }
+
+                        Spacer(minLength: 0)
+
+                        if let metadata, metadata.notificationCount > 0 {
+                            workspaceMetricBadge(
+                                "\(metadata.notificationCount) alert\(metadata.notificationCount == 1 ? "" : "s")"
                             )
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .stroke(
-                                isActive
-                                    ? glowColor.opacity(visualState.borderOpacity)
-                                    : (visualState.showsAttention
-                                        ? glowColor.opacity(visualState.borderOpacity)
-                                        : Color.white.opacity(visualState.borderOpacity)),
-                                lineWidth: 1
-                            )
-                    )
-                    .shadow(
-                        color: isActive ? glowColor.opacity(visualState.glowOpacity) : .clear,
-                        radius: 10
-                    )
+                        }
+                    }
                 }
-                .buttonStyle(.plain)
+                .padding(.vertical, 9)
+                .padding(.horizontal, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(
+                            isActive
+                                ? Color.accentColor.opacity(visualState.backgroundOpacity)
+                                : Color.white.opacity(visualState.backgroundOpacity)
+                        )
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(
+                            isActive
+                                ? glowColor.opacity(visualState.borderOpacity)
+                                : (visualState.showsAttention
+                                    ? glowColor.opacity(visualState.borderOpacity)
+                                    : Color.white.opacity(visualState.borderOpacity)),
+                            lineWidth: 1
+                        )
+                )
+                .shadow(
+                    color: isActive ? glowColor.opacity(visualState.glowOpacity) : .clear,
+                    radius: 10
+                )
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    guard !isRenaming else {
+                        return
+                    }
+                    _ = registry.activateWorkspace(id: entry.id)
+                }
+                .contextMenu {
+                    Button("Rename Workspace") {
+                        beginWorkspaceRename(entry: entry)
+                    }
+
+                    Button("Close Workspace") {
+                        _ = registry.closeWorkspace(id: entry.id)
+                    }
+                    .disabled(registry.entries.count <= 1)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(
+                    Text(
+                        metadata.map {
+                            "\($0.name), \($0.sessionCount) sessions, \($0.groupCount) groups, \($0.paneCount) panes"
+                        } ?? entry.name
+                    )
+                )
             }
         }
         .padding(10)
@@ -351,7 +417,8 @@ public struct SessionSidebarView: View {
             workspace: workspace,
             descriptor: descriptor,
             isFocusedInTiling: descriptor.id == focusedSessionID,
-            gitChangeSummary: workspace.gitChangeSummary(for: descriptor.id)
+            gitChangeSummary: workspace.gitChangeSummary(for: descriptor.id),
+            durationReferenceDate: durationReferenceDate
         )
     }
 
@@ -424,6 +491,39 @@ public struct SessionSidebarView: View {
 
     private func createGroup() {
         let group = workspace.createGroup(name: "", colorTag: nil)
+        _ = workspace.selectGroup(id: group.id)
         pendingRenameGroupID = group.id
+    }
+
+    private func createWorkspace(in registry: WorkspaceRegistry) {
+        let entry = registry.createWorkspace(name: nextWorkspaceName(in: registry))
+        beginWorkspaceRename(entry: entry)
+    }
+
+    private func beginWorkspaceRename(entry: WorkspaceEntry) {
+        pendingRenameWorkspaceID = entry.id
+        workspaceRenameController.beginRename(
+            currentTitle: entry.name,
+            selectionBehavior: .selectAll
+        )
+    }
+
+    private func commitWorkspaceRename(entry: WorkspaceEntry, registry: WorkspaceRegistry) {
+        let committed = workspaceRenameController.commit()
+        _ = registry.renameWorkspace(id: entry.id, name: committed)
+        pendingRenameWorkspaceID = nil
+    }
+
+    private func cancelWorkspaceRename() {
+        workspaceRenameController.cancel()
+        pendingRenameWorkspaceID = nil
+    }
+
+    private func nextWorkspaceName(in registry: WorkspaceRegistry) -> String {
+        var index = registry.entries.count + 1
+        while registry.entries.contains(where: { $0.name == "Workspace \(index)" }) {
+            index += 1
+        }
+        return "Workspace \(index)"
     }
 }

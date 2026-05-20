@@ -365,6 +365,75 @@ final class SessionWorkspaceTests: XCTestCase {
         _ = cancellable
     }
 
+    func testUpdateSessionContextSkipsGitRefreshForDetachedSession() async throws {
+        var refreshedRoots: [String] = []
+        let workspace = makeTestWorkspace(
+            autoStartSessions: false,
+            gitRootResolver: { workingDirectory in
+                workingDirectory.hasPrefix("/tmp/repo") ? "/tmp/repo" : nil
+            },
+            gitChangeSummaryResolver: { gitRoot in
+                refreshedRoots.append(gitRoot)
+                return WorkspaceGitChangeSummary(addedCount: 1, removedCount: 0)
+            },
+            gitRefreshCacheTTL: 60
+        )
+        let detachedSession = workspace.createSession(selectNewSession: false)
+
+        XCTAssertTrue(
+            workspace.updateSessionContext(
+                id: detachedSession.id,
+                workingDirectoryPath: "/tmp/repo/subdir",
+                foregroundProcessName: "zsh"
+            )
+        )
+
+        try await Task.sleep(nanoseconds: 700_000_000)
+
+        XCTAssertTrue(refreshedRoots.isEmpty)
+        XCTAssertNil(workspace.gitChangeSummary(for: detachedSession.id))
+    }
+
+    func testGitRefreshReusesCachedRootSummaryAcrossVisibleSessions() async throws {
+        var refreshCount = 0
+        let workspace = makeTestWorkspace(
+            autoStartSessions: false,
+            gitRootResolver: { workingDirectory in
+                workingDirectory.hasPrefix("/tmp/repo") ? "/tmp/repo" : nil
+            },
+            gitChangeSummaryResolver: { _ in
+                refreshCount += 1
+                return WorkspaceGitChangeSummary(addedCount: 3, removedCount: 1)
+            },
+            gitRefreshCacheTTL: 60
+        )
+        let firstSessionID = try XCTUnwrap(workspace.activeSessionID)
+
+        XCTAssertTrue(
+            workspace.updateSessionContext(
+                id: firstSessionID,
+                workingDirectoryPath: "/tmp/repo",
+                foregroundProcessName: "zsh"
+            )
+        )
+        try await waitUntil { refreshCount == 1 }
+
+        XCTAssertTrue(workspace.splitActivePane(.vertical))
+        let secondSessionID = try XCTUnwrap(workspace.activeSessionID)
+        XCTAssertTrue(
+            workspace.updateSessionContext(
+                id: secondSessionID,
+                workingDirectoryPath: "/tmp/repo/subdir",
+                foregroundProcessName: "zsh"
+            )
+        )
+        try await waitUntil { workspace.gitRefreshCacheHitCount == 1 }
+
+        XCTAssertEqual(refreshCount, 1)
+        XCTAssertEqual(workspace.gitRefreshExecutionCount, 1)
+        XCTAssertEqual(workspace.gitChangeSummary(for: secondSessionID), WorkspaceGitChangeSummary(addedCount: 3, removedCount: 1))
+    }
+
     // MARK: - Adaptive Drop Placement
 
     func testAdaptivelyPlaceSessionCreatesHorizontalSplitFromSinglePane() throws {
@@ -458,5 +527,58 @@ final class SessionWorkspaceTests: XCTestCase {
         )
 
         XCTAssertEqual(workspace.workspaceGraph.paneCount, 5)
+    }
+
+    func testRepeatedGitRefreshWithUnchangedSummaryDoesNotPublish() async throws {
+        let gitRoot = "/tmp/mvx-git-test"
+        let summary = WorkspaceGitChangeSummary(addedCount: 2, removedCount: 1)
+        let workspace = makeTestWorkspace(
+            autoStartSessions: false,
+            gitRootResolver: { _ in gitRoot },
+            gitChangeSummaryResolver: { _ in summary },
+            gitRefreshCacheTTL: 300
+        )
+        let sessionID = try! XCTUnwrap(workspace.activeSessionID)
+        _ = workspace.updateSessionContext(
+            id: sessionID,
+            workingDirectoryPath: gitRoot,
+            foregroundProcessName: "zsh"
+        )
+        workspace.scheduleGitRefresh(for: [sessionID])
+
+        try await waitUntil {
+            workspace.gitChangeSummary(for: sessionID) != nil
+        }
+
+        var publishCount = 0
+        let cancellable = workspace.$sessionGitChanges.sink { _ in
+            publishCount += 1
+        }
+        let beforeCount = publishCount
+
+        workspace.scheduleGitRefresh(for: [sessionID])
+        try await waitUntil {
+            workspace.gitRefreshTask == nil
+        }
+
+        XCTAssertEqual(publishCount, beforeCount)
+        cancellable.cancel()
+    }
+
+    private func waitUntil(
+        timeoutNanoseconds: UInt64 = 1_500_000_000,
+        pollIntervalNanoseconds: UInt64 = 10_000_000,
+        condition: @escaping @MainActor () -> Bool
+    ) async throws {
+        let deadline = DispatchTime.now().uptimeNanoseconds + timeoutNanoseconds
+
+        while !condition() {
+            if DispatchTime.now().uptimeNanoseconds >= deadline {
+                XCTFail("Timed out waiting for condition")
+                return
+            }
+
+            try await Task.sleep(nanoseconds: pollIntervalNanoseconds)
+        }
     }
 }

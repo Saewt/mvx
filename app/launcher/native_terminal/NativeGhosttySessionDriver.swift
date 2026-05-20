@@ -41,7 +41,6 @@ final class NativeGhosttySessionDriver: TerminalSessionDriver {
 
         _ = self.surfaceRuntime.addRuntimeEventObserver { [weak self] event in
             self?.notifyRuntimeEventObservers(event)
-            self?.notifyActivityObservers()
         }
 
         surfaceRuntime.onAgentStatusReceived = { [weak self] update in

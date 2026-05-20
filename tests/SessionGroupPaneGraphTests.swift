@@ -99,18 +99,57 @@ final class SessionGroupPaneGraphTests: XCTestCase {
         XCTAssertEqual(workspace.sessionGroupAssignments[sessionID], destination.id)
     }
 
-    func testDeleteGroupMovesSessionsToUngrouped() throws {
+    func testDeleteGroupPreservesSessionsAsUngrouped() throws {
         let workspace = makeTestWorkspace(autoStartSessions: false)
-        let sessionID = try XCTUnwrap(workspace.activeSessionID)
+        let firstID = try XCTUnwrap(workspace.activeSessionID)
+        let second = workspace.createSession(selectNewSession: false)
+        let ungrouped = workspace.createSession(selectNewSession: false)
         let group = workspace.createGroup(name: "Frontend", colorTag: nil)
 
-        XCTAssertTrue(workspace.assignSession(id: sessionID, toGroup: group.id))
+        XCTAssertTrue(workspace.assignSession(id: firstID, toGroup: group.id))
+        XCTAssertTrue(workspace.assignSession(id: second.id, toGroup: group.id))
         XCTAssertTrue(workspace.selectGroup(id: group.id))
         XCTAssertTrue(workspace.deleteGroup(id: group.id))
 
         XCTAssertNil(workspace.activeGroupID)
-        XCTAssertNil(workspace.sessionGroupAssignments[sessionID])
-        XCTAssertEqual(workspace.workspaceGraph.leafSessionIDs, [sessionID])
+        XCTAssertNil(workspace.sessionGroups.first(where: { $0.id == group.id }))
+        XCTAssertNotNil(workspace.descriptor(for: firstID))
+        XCTAssertNotNil(workspace.descriptor(for: second.id))
+        XCTAssertNotNil(workspace.descriptor(for: ungrouped.id))
+        XCTAssertEqual(workspace.sessions.count, 3)
+        XCTAssertEqual(workspace.sessions(inGroup: nil).map(\.id).sorted(), [firstID, second.id, ungrouped.id].sorted())
+    }
+
+    func testDeleteActiveGroupPreservesSessionAsUngrouped() throws {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+        let firstID = try XCTUnwrap(workspace.activeSessionID)
+        let group = workspace.createGroup(name: "Only", colorTag: nil)
+
+        XCTAssertTrue(workspace.assignSession(id: firstID, toGroup: group.id))
+        XCTAssertTrue(workspace.selectGroup(id: group.id))
+        XCTAssertTrue(workspace.deleteGroup(id: group.id))
+
+        XCTAssertNil(workspace.activeGroupID)
+        XCTAssertNotNil(workspace.descriptor(for: firstID))
+        XCTAssertEqual(workspace.sessions.count, 1)
+        XCTAssertEqual(workspace.sessions(inGroup: nil).count, 1)
+    }
+
+    func testDeleteInactiveGroupPreservesAndUngroupsSessions() throws {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+        let activeID = try XCTUnwrap(workspace.activeSessionID)
+        let inactiveSession = workspace.createSession(selectNewSession: false)
+        let group = workspace.createGroup(name: "Inactive", colorTag: nil)
+
+        XCTAssertTrue(workspace.assignSession(id: inactiveSession.id, toGroup: group.id))
+        XCTAssertTrue(workspace.deleteGroup(id: group.id))
+
+        XCTAssertNil(workspace.activeGroupID)
+        XCTAssertNotNil(workspace.descriptor(for: activeID))
+        XCTAssertNotNil(workspace.descriptor(for: inactiveSession.id))
+        XCTAssertEqual(workspace.sessions.count, 2)
+        XCTAssertTrue(workspace.sessions(inGroup: nil).map(\.id).contains(activeID))
+        XCTAssertTrue(workspace.sessions(inGroup: nil).map(\.id).contains(inactiveSession.id))
     }
 
     func testSnapshotRoundTripsGroupPaneGraphsAndActiveGroup() throws {
@@ -184,6 +223,79 @@ final class SessionGroupPaneGraphTests: XCTestCase {
         XCTAssertEqual(restored.sessionGroups.count, 1)
         XCTAssertNil(restored.sessionGroups[0].note)
         XCTAssertEqual(restored.sessionGroups[0].paneGraph.leafSessionIDs, [sessionID])
+    }
+
+    func testSelectEmptyGroupCreatesOneTerminal() throws {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+        _ = try XCTUnwrap(workspace.activeSessionID)
+        let group = workspace.createGroup(name: "Empty", colorTag: nil)
+
+        XCTAssertTrue(workspace.selectGroup(id: group.id))
+        let sessionsInGroup = workspace.sessions(inGroup: group.id)
+
+        XCTAssertEqual(workspace.activeGroupID, group.id)
+        XCTAssertEqual(sessionsInGroup.count, 1)
+        XCTAssertNotNil(workspace.workspaceGraph.rootPane)
+        XCTAssertEqual(workspace.workspaceGraph.leafSessionIDs.count, 1)
+    }
+
+    func testSelectGroupDoesNotCreateTerminalForUngrouped() throws {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+        let ungroupedID = try XCTUnwrap(workspace.activeSessionID)
+        let group = workspace.createGroup(name: "Group", colorTag: nil)
+
+        XCTAssertTrue(workspace.selectGroup(id: group.id))
+        let sessionCount = workspace.sessions.count
+
+        XCTAssertTrue(workspace.selectGroup(id: nil))
+        XCTAssertNil(workspace.activeGroupID)
+        XCTAssertEqual(workspace.sessions.count, sessionCount)
+        XCTAssertEqual(workspace.sessions(inGroup: nil).map(\.id), [ungroupedID])
+    }
+
+    func testReselectingEmptyActiveGroupCreatesTerminal() throws {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+        _ = try XCTUnwrap(workspace.activeSessionID)
+        let group = workspace.createGroup(name: "Empty", colorTag: nil)
+
+        XCTAssertTrue(workspace.selectGroup(id: group.id))
+        XCTAssertEqual(workspace.sessions(inGroup: group.id).count, 1)
+
+        let firstSessionID = try XCTUnwrap(workspace.activeSessionID)
+        XCTAssertTrue(workspace.closeSession(id: firstSessionID))
+        XCTAssertEqual(workspace.sessions(inGroup: group.id).count, 0)
+        XCTAssertNil(workspace.activeSessionID)
+
+        XCTAssertTrue(workspace.selectGroup(id: group.id))
+        XCTAssertEqual(workspace.sessions(inGroup: group.id).count, 1)
+        XCTAssertNotNil(workspace.activeSessionID)
+        XCTAssertNotNil(workspace.workspaceGraph.rootPane)
+    }
+
+    func testRestoredActiveEmptyGroupEnablesSplitCommands() throws {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+        let firstID = try XCTUnwrap(workspace.activeSessionID)
+        let ungrouped = workspace.createSession(selectNewSession: false)
+        let group = workspace.createGroup(name: "Frontend", colorTag: nil)
+
+        XCTAssertTrue(workspace.assignSession(id: firstID, toGroup: group.id))
+        XCTAssertTrue(workspace.selectGroup(id: group.id))
+        XCTAssertTrue(workspace.closeSession(id: firstID))
+        XCTAssertEqual(workspace.sessions(inGroup: group.id).count, 0)
+
+        let snapshot = workspace.snapshot()
+        let restored = makeTestWorkspace(autoStartSessions: false, startsWithSession: false)
+
+        XCTAssertTrue(restored.restore(from: snapshot))
+        XCTAssertEqual(restored.activeGroupID, group.id)
+        XCTAssertEqual(restored.sessions(inGroup: group.id).count, 1)
+        XCTAssertNotNil(restored.workspaceGraph.rootPane)
+        XCTAssertNotNil(restored.activeSessionID)
+
+        let handler = WorkspaceCommandHandler(workspace: restored)
+        let descriptors = Dictionary(uniqueKeysWithValues: handler.availableCommands().map { ($0.command, $0) })
+        XCTAssertTrue(try XCTUnwrap(descriptors[.splitHorizontal]).isEnabled)
+        XCTAssertTrue(try XCTUnwrap(descriptors[.splitVertical]).isEnabled)
     }
 
     private func groupState(in workspace: SessionWorkspace, id: UUID) -> SessionGroup? {

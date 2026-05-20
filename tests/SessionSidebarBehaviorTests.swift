@@ -175,6 +175,19 @@ final class SessionSidebarBehaviorTests: XCTestCase {
         )
     }
 
+    func testDurationStateUsesInjectedReferenceDate() {
+        let startedAt = Date(timeIntervalSinceReferenceDate: 500)
+        let referenceDate = startedAt.addingTimeInterval(125)
+
+        let state = SessionTabDurationState.resolve(
+            startedAt: startedAt,
+            isRenaming: false,
+            referenceDate: referenceDate
+        )
+
+        XCTAssertEqual(state.label, "2m")
+    }
+
     func testSplitMenuStateDisablesWithoutFocusedPane() {
         let workspace = makeTestWorkspace(autoStartSessions: false, startsWithSession: false)
 
@@ -354,11 +367,15 @@ final class SessionSidebarBehaviorTests: XCTestCase {
             foregroundProcessName: "zsh"
         ))
         XCTAssertTrue(workspace.updateAgentStatus(id: activeID, status: .waiting))
+        _ = workspace.createSession(selectNewSession: false)
+        _ = workspace.createGroup(name: "Frontend", colorTag: nil)
 
         let metadata = try! XCTUnwrap(registry.cardMetadata(for: entry.id))
 
         XCTAssertEqual(metadata.name, "Alpha")
         XCTAssertEqual(metadata.branchName, "feature/sidebar-card")
+        XCTAssertEqual(metadata.sessionCount, 2)
+        XCTAssertEqual(metadata.groupCount, 1)
         XCTAssertEqual(metadata.paneCount, 1)
         XCTAssertEqual(metadata.notificationCount, 1)
         XCTAssertEqual(metadata.waitingCount, 1)

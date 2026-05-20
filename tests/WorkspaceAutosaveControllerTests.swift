@@ -68,7 +68,7 @@ final class WorkspaceAutosaveControllerTests: XCTestCase {
         }
     }
 
-    func testRenamingGroupWithoutNoteChangeDoesNotTriggerAutosave() async throws {
+    func testRenamingGroupTriggersAutosave() async throws {
         let workspace = makeTestWorkspace(autoStartSessions: false)
         let group = workspace.createGroup(name: "Frontend", colorTag: nil)
         var snapshots: [WorkspaceSnapshot] = []
@@ -82,7 +82,80 @@ final class WorkspaceAutosaveControllerTests: XCTestCase {
 
         XCTAssertTrue(workspace.renameGroup(id: group.id, name: "API"))
 
-        try await Task.sleep(nanoseconds: 80_000_000)
+        try await waitUntil { snapshots.count == 1 }
+        withExtendedLifetime(controller) {
+            XCTAssertEqual(snapshots.count, 1)
+            XCTAssertEqual(snapshots.first?.sessionGroups.first?.name, "API")
+        }
+    }
+
+    func testStructuralWorkspaceChangesTriggerAutosave() async throws {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+        var snapshots: [WorkspaceSnapshot] = []
+        let controller = WorkspaceAutosaveController(
+            workspace: workspace,
+            debounceInterval: .milliseconds(25),
+            persistSnapshot: { snapshot in
+                snapshots.append(snapshot)
+            }
+        )
+
+        let group = workspace.createGroup(name: "Backend", colorTag: nil)
+        XCTAssertTrue(workspace.setGroupColorTag(id: group.id, colorTag: .teal))
+        XCTAssertTrue(workspace.setGroupCollapsed(id: group.id, isCollapsed: true))
+
+        try await waitUntil { snapshots.count == 1 }
+        withExtendedLifetime(controller) {
+            XCTAssertEqual(snapshots.count, 1)
+            XCTAssertEqual(snapshots.first?.sessionGroups.first?.colorTag, .teal)
+            XCTAssertEqual(snapshots.first?.sessionGroups.first?.isCollapsed, true)
+        }
+    }
+
+    func testSessionCreateCloseAndAssignmentTriggerAutosave() async throws {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+        let group = workspace.createGroup(name: "Backend", colorTag: nil)
+        var snapshots: [WorkspaceSnapshot] = []
+        let controller = WorkspaceAutosaveController(
+            workspace: workspace,
+            debounceInterval: .milliseconds(25),
+            persistSnapshot: { snapshot in
+                snapshots.append(snapshot)
+            }
+        )
+
+        let created = workspace.createSession(selectNewSession: false)
+        XCTAssertTrue(workspace.assignSession(id: created.id, toGroup: group.id))
+        XCTAssertTrue(workspace.closeSession(id: created.id))
+
+        try await waitUntil { snapshots.count == 1 }
+        withExtendedLifetime(controller) {
+            XCTAssertEqual(snapshots.count, 1)
+            XCTAssertEqual(snapshots.first?.sessions.count, 1)
+            XCTAssertTrue(snapshots.first?.sessionGroupAssignments.isEmpty == true)
+        }
+    }
+
+    func testVolatileSessionChangesDoNotTriggerAutosave() async throws {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+        let sessionID = try XCTUnwrap(workspace.activeSessionID)
+        var snapshots: [WorkspaceSnapshot] = []
+        let controller = WorkspaceAutosaveController(
+            workspace: workspace,
+            debounceInterval: .milliseconds(25),
+            persistSnapshot: { snapshot in
+                snapshots.append(snapshot)
+            }
+        )
+
+        XCTAssertTrue(workspace.updateAgentStatus(id: sessionID, status: .waiting))
+        XCTAssertTrue(workspace.updateSessionContext(
+            id: sessionID,
+            workingDirectoryPath: nil,
+            foregroundProcessName: "zsh"
+        ))
+
+        try await Task.sleep(nanoseconds: 90_000_000)
         withExtendedLifetime(controller) {
             XCTAssertTrue(snapshots.isEmpty)
         }

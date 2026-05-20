@@ -84,17 +84,22 @@ final class GhosttySurfaceRuntime {
         ensureSurfaceIfPossible()
     }
 
-    func detach(from view: NativeGhosttyNSView? = nil) {
+    func detach(from view: NativeGhosttyNSView? = nil, treatAsTransient: Bool = false) {
         guard view == nil || hostView === view else {
             return
+        }
+
+        if treatAsTransient {
+            beginTransientMove()
+        } else {
+            endTransientMove()
+            setFocused(false)
+            setVisible(false)
         }
 
         renderView.removeFromSuperview()
         hostView = nil
         isAttached = false
-        if !isInTransientMove {
-            isVisible = false
-        }
     }
 
     func beginTransientMove() {
@@ -222,7 +227,7 @@ final class GhosttySurfaceRuntime {
             forceDisplayReassert: forceRefresh
         )
         if didUpdate {
-            GhosttyAppRuntime.shared.tickIfNeeded()
+            GhosttyAppRuntime.shared.scheduleTickIfNeeded()
         }
 
         return viewport.isStable
@@ -241,7 +246,7 @@ final class GhosttySurfaceRuntime {
         lastDisplayID = displayID
         ghostty_surface_set_display_id(surface, displayID)
         appliedDisplayID = displayID
-        GhosttyAppRuntime.shared.tickIfNeeded()
+        GhosttyAppRuntime.shared.scheduleTickIfNeeded()
     }
 
     func forceRefresh() {
@@ -263,7 +268,7 @@ final class GhosttySurfaceRuntime {
             forceDisplayReassert: true
         )
         if didUpdate {
-            GhosttyAppRuntime.shared.tickIfNeeded()
+            GhosttyAppRuntime.shared.scheduleTickIfNeeded()
         }
     }
 
@@ -392,7 +397,7 @@ final class GhosttySurfaceRuntime {
             break
         }
 
-        GhosttyAppRuntime.shared.tickIfNeeded()
+        GhosttyAppRuntime.shared.scheduleTickIfNeeded()
     }
 
     func copySelection() -> String? {

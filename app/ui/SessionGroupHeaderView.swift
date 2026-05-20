@@ -28,6 +28,9 @@ public struct SessionGroupHeaderView: View {
     public var body: some View {
         let aggregateStatus = workspace.aggregatedAgentStatus(forGroup: group.id)
         let sessionCount = workspace.sessions(inGroup: group.id).count
+        let doneSessionCount = workspace.sessions(inGroup: group.id)
+            .filter { $0.agentStatus == .done }
+            .count
         let collapseActionLabel = Self.collapseActionLabel(isCollapsed: group.isCollapsed)
 
         return HStack(spacing: 8) {
@@ -145,6 +148,27 @@ public struct SessionGroupHeaderView: View {
                 Button("None") {
                     _ = workspace.setGroupColorTag(id: group.id, colorTag: nil)
                 }
+            }
+
+            Divider()
+
+            Button("Close Done Sessions") {
+                _ = workspace.closeDoneSessions(inGroup: group.id)
+            }
+            .disabled(doneSessionCount == 0)
+
+            Button("Close All Sessions") {
+                _ = workspace.closeAllSessions(inGroup: group.id)
+            }
+            .disabled(sessionCount == 0)
+
+            Button("Move All to Ungrouped") {
+                _ = workspace.moveAllSessions(fromGroup: group.id, toGroup: nil)
+            }
+            .disabled(sessionCount == 0)
+
+            Button("Collapse Other Groups") {
+                _ = workspace.collapseOtherGroups(excluding: group.id)
             }
 
             Divider()

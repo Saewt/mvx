@@ -173,9 +173,107 @@ final class SessionWorkspacePersistenceTests: XCTestCase {
         XCTAssertEqual(restoredRegistry.workspace(for: first.id)?.workspaceNote?.body, "Alpha follow-up")
     }
 
+    func testRegistryAutosavesIndependentWorkspaceStructuralChanges() async throws {
+        let persistence = WorkspacePersistence(fileURL: temporaryWorkspaceURL())
+        let registry = WorkspaceRegistry(
+            persistence: persistence,
+            autosaveDebounceInterval: .milliseconds(25),
+            workspaceFactory: { _ in
+                makeTestWorkspace(autoStartSessions: false)
+            }
+        )
+        let first = registry.createWorkspace(name: "Alpha")
+        let second = registry.createWorkspace(name: "Beta")
+        let firstWorkspace = try XCTUnwrap(registry.workspace(for: first.id))
+        let secondWorkspace = try XCTUnwrap(registry.workspace(for: second.id))
+        let firstSessionID = try XCTUnwrap(firstWorkspace.activeSessionID)
+
+        XCTAssertTrue(firstWorkspace.renameSession(id: firstSessionID, title: "Alpha API"))
+        _ = secondWorkspace.createGroup(name: "Backend", colorTag: .blue)
+
+        try await waitUntil {
+            guard let snapshot = persistence.loadRegistry() else {
+                return false
+            }
+
+            let workspaces = Dictionary(uniqueKeysWithValues: snapshot.workspaces.map { ($0.id, $0) })
+            return workspaces[first.id]?.workspaceSnapshot.sessions.first?.descriptor.customTitle == "Alpha API"
+                && workspaces[second.id]?.workspaceSnapshot.sessionGroups.first?.name == "Backend"
+                && persistence.load()?.sessionGroups.first?.name == "Backend"
+        }
+
+        withExtendedLifetime(registry) {
+            let snapshot = persistence.loadRegistry()
+            XCTAssertEqual(snapshot?.workspaces.count, 2)
+            XCTAssertEqual(persistence.load()?.sessionGroups.first?.colorTag, .blue)
+        }
+    }
+
+    func testRestoreOnlyRefreshesVisibleSessionsInActiveGroup() async throws {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+        let firstSessionID = try XCTUnwrap(workspace.activeSessionID)
+        let secondSession = workspace.createSession(selectNewSession: false)
+        let alpha = workspace.createGroup(name: "Alpha", colorTag: nil)
+        let beta = workspace.createGroup(name: "Beta", colorTag: nil)
+
+        XCTAssertTrue(workspace.assignSession(id: firstSessionID, toGroup: alpha.id))
+        XCTAssertTrue(workspace.assignSession(id: secondSession.id, toGroup: beta.id))
+        XCTAssertTrue(
+            workspace.updateSessionContext(
+                id: firstSessionID,
+                workingDirectoryPath: "/tmp/repo-alpha",
+                foregroundProcessName: "zsh"
+            )
+        )
+        XCTAssertTrue(
+            workspace.updateSessionContext(
+                id: secondSession.id,
+                workingDirectoryPath: "/tmp/repo-beta",
+                foregroundProcessName: "zsh"
+            )
+        )
+        XCTAssertTrue(workspace.selectGroup(id: beta.id))
+        XCTAssertTrue(workspace.selectSession(id: secondSession.id))
+
+        let snapshot = workspace.snapshot()
+        var refreshedRoots: [String] = []
+        let restored = makeTestWorkspace(
+            autoStartSessions: false,
+            startsWithSession: false,
+            gitRootResolver: { $0 },
+            gitChangeSummaryResolver: { gitRoot in
+                refreshedRoots.append(gitRoot)
+                return WorkspaceGitChangeSummary(addedCount: 1, removedCount: 0)
+            },
+            gitRefreshCacheTTL: 60
+        )
+
+        XCTAssertTrue(restored.restore(from: snapshot))
+        try await waitUntil { !refreshedRoots.isEmpty }
+
+        XCTAssertEqual(refreshedRoots, ["/tmp/repo-beta"])
+    }
+
     private func temporaryWorkspaceURL() -> URL {
         FileManager.default.temporaryDirectory
             .appendingPathComponent("mvx-workspace-\(UUID().uuidString)", isDirectory: true)
             .appendingPathComponent("workspace.json")
+    }
+
+    private func waitUntil(
+        timeoutNanoseconds: UInt64 = 1_500_000_000,
+        pollIntervalNanoseconds: UInt64 = 10_000_000,
+        condition: @escaping @MainActor () -> Bool
+    ) async throws {
+        let deadline = DispatchTime.now().uptimeNanoseconds + timeoutNanoseconds
+
+        while !condition() {
+            if DispatchTime.now().uptimeNanoseconds >= deadline {
+                XCTFail("Timed out waiting for condition")
+                return
+            }
+
+            try await Task.sleep(nanoseconds: pollIntervalNanoseconds)
+        }
     }
 }

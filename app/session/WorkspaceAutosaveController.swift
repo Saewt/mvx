@@ -1,11 +1,6 @@
 import Combine
 import Foundation
 
-private struct GroupNoteAutosaveState: Equatable {
-    let id: UUID
-    let note: WorkspaceNoteSnapshot?
-}
-
 @MainActor
 public final class WorkspaceAutosaveController {
     private let workspace: SessionWorkspace
@@ -46,22 +41,42 @@ public final class WorkspaceAutosaveController {
         debounceInterval: DispatchQueue.SchedulerTimeType.Stride,
         scheduler: DispatchQueue
     ) {
-        let workspaceNoteChanges = workspace.$workspaceNote
-            .removeDuplicates()
-            .dropFirst()
-            .map { _ in () }
+        let sessionStructures = workspace.$sessions
+            .map { sessions in
+                sessions.map { SessionStructuralAutosaveState(descriptor: $0) }
+            }
 
-        let groupNoteChanges = workspace.$sessionGroups
+        let groupStructures = workspace.$sessionGroups
             .map { groups in
-                groups
-                    .map { GroupNoteAutosaveState(id: $0.id, note: $0.note) }
-                    .sorted { $0.id.uuidString < $1.id.uuidString }
+                groups.map { GroupStructuralAutosaveState(group: $0) }
+            }
+
+        Publishers.CombineLatest4(
+            sessionStructures,
+            workspace.$activeSessionID,
+            workspace.$workspaceGraph,
+            workspace.$activeGroupID
+        )
+        .combineLatest(
+            Publishers.CombineLatest3(
+                groupStructures,
+                workspace.$sessionGroupAssignments,
+                workspace.$workspaceNote
+            )
+        )
+            .map { structural, secondary in
+                StructuralAutosaveProjection(
+                    sessions: structural.0,
+                    activeSessionID: structural.1,
+                    workspaceGraph: structural.2,
+                    activeGroupID: structural.3,
+                    sessionGroups: secondary.0,
+                    sessionGroupAssignments: secondary.1,
+                    workspaceNote: secondary.2
+                )
             }
             .removeDuplicates()
             .dropFirst()
-            .map { _ in () }
-
-        Publishers.Merge(workspaceNoteChanges, groupNoteChanges)
             .debounce(for: debounceInterval, scheduler: scheduler)
             .sink { [weak self] _ in
                 self?.persistLatestSnapshot()
@@ -75,5 +90,47 @@ public final class WorkspaceAutosaveController {
         } catch {
             return
         }
+    }
+}
+
+private struct StructuralAutosaveProjection: Equatable {
+    let sessions: [SessionStructuralAutosaveState]
+    let activeSessionID: UUID?
+    let workspaceGraph: WorkspaceGraph
+    let activeGroupID: UUID?
+    let sessionGroups: [GroupStructuralAutosaveState]
+    let sessionGroupAssignments: [UUID: UUID]
+    let workspaceNote: WorkspaceNoteSnapshot?
+}
+
+private struct SessionStructuralAutosaveState: Equatable {
+    let id: UUID
+    let ordinal: Int
+    let customTitle: String?
+    let workingDirectoryPath: String?
+
+    init(descriptor: SessionDescriptor) {
+        self.id = descriptor.id
+        self.ordinal = descriptor.ordinal
+        self.customTitle = descriptor.customTitle
+        self.workingDirectoryPath = descriptor.workingDirectoryPath
+    }
+}
+
+private struct GroupStructuralAutosaveState: Equatable {
+    let id: UUID
+    let name: String
+    let colorTag: SessionGroupColor?
+    let isCollapsed: Bool
+    let paneGraph: WorkspaceGraph
+    let note: WorkspaceNoteSnapshot?
+
+    init(group: SessionGroup) {
+        self.id = group.id
+        self.name = group.name
+        self.colorTag = group.colorTag
+        self.isCollapsed = group.isCollapsed
+        self.paneGraph = group.paneGraph
+        self.note = group.note
     }
 }

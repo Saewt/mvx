@@ -105,6 +105,15 @@ public enum FocusedPanePlacementAction: Equatable {
     case replace
 }
 
+private struct GitRefreshCacheEntry {
+    let summary: WorkspaceGitChangeSummary?
+    let refreshedAt: Date
+
+    func isValid(at date: Date, ttl: TimeInterval) -> Bool {
+        date.timeIntervalSince(refreshedAt) < ttl
+    }
+}
+
 @MainActor
 public final class SessionWorkspace: ObservableObject {
     @Published public private(set) var sessions: [SessionDescriptor] {
@@ -128,15 +137,22 @@ public final class SessionWorkspace: ObservableObject {
     public let autoStartSessions: Bool
 
     private let sessionFactory: (URL?) -> TerminalSession
+    private let gitRootResolver: (String) -> String?
+    private let gitChangeSummaryResolver: (String) -> WorkspaceGitChangeSummary?
+    private let gitRefreshCacheTTL: TimeInterval
     private var runtimes: [UUID: TerminalSession]
     private var sessionStartedAtByID: [UUID: Date]
     private var nextOrdinal: Int
     private var ungroupedGraph: WorkspaceGraph
     private var pendingGitRefreshSessionIDs: Set<UUID>
-    private var gitRefreshTask: Task<Void, Never>?
+    private var gitRefreshCache: [String: GitRefreshCacheEntry]
+    var gitRefreshTask: Task<Void, Never>?
     private var isVisibleRefreshScheduled = false
     private var cachedWorkspaceMetadata: WorkspaceMetadataSnapshot?
     private var isWorkspaceMetadataDirty = true
+
+    private(set) var gitRefreshExecutionCount = 0
+    private(set) var gitRefreshCacheHitCount = 0
 
     public convenience init(
         autoStartSessions: Bool = true,
@@ -153,10 +169,16 @@ public final class SessionWorkspace: ObservableObject {
     public init(
         autoStartSessions: Bool = true,
         startsWithSession: Bool = true,
-        sessionFactoryWithStartupDirectory: @escaping (URL?) -> TerminalSession = SessionWorkspace.unsupportedSessionFactoryWithStartupDirectory()
+        sessionFactoryWithStartupDirectory: @escaping (URL?) -> TerminalSession = SessionWorkspace.unsupportedSessionFactoryWithStartupDirectory(),
+        gitRootResolver: ((String) -> String?)? = nil,
+        gitChangeSummaryResolver: ((String) -> WorkspaceGitChangeSummary?)? = nil,
+        gitRefreshCacheTTL: TimeInterval = 5
     ) {
         self.autoStartSessions = autoStartSessions
         self.sessionFactory = sessionFactoryWithStartupDirectory
+        self.gitRootResolver = gitRootResolver ?? WorkspaceMetadataSnapshot.gitRoot(for:)
+        self.gitChangeSummaryResolver = gitChangeSummaryResolver ?? WorkspaceMetadataSnapshot.gitWorkingTreeDelta(workingDirectory:)
+        self.gitRefreshCacheTTL = max(gitRefreshCacheTTL, 0)
         self.sessions = []
         self.activeSessionID = nil
         self.workspaceGraph = WorkspaceGraph()
@@ -170,6 +192,7 @@ public final class SessionWorkspace: ObservableObject {
         self.nextOrdinal = 1
         self.ungroupedGraph = WorkspaceGraph()
         self.pendingGitRefreshSessionIDs = []
+        self.gitRefreshCache = [:]
 
         if startsWithSession {
             _ = createSession()
@@ -207,6 +230,10 @@ public final class SessionWorkspace: ObservableObject {
 
     public var activeScopeNote: WorkspaceNoteSnapshot? {
         note(forGroup: activeGroupID)
+    }
+
+    var activeLeafPaneCount: Int {
+        workspaceGraph.paneCount
     }
 
     public func descriptor(for id: UUID) -> SessionDescriptor? {
@@ -361,32 +388,22 @@ public final class SessionWorkspace: ObservableObject {
             return false
         }
 
-        let deletedGroup = sessionGroups[index]
-
         if activeGroupID == id {
             _ = selectGroup(id: nil)
         }
 
-        let movedSessionIDs = sessions(inGroup: id).map(\.id)
-        let normalizedDeletedGraph = normalize(
-            deletedGroup.paneGraph,
-            allowedSessionIDs: Set(movedSessionIDs),
-            preferredSessionID: movedSessionIDs.first
-        )
-
-        for sessionID in movedSessionIDs {
+        let groupSessionIDs = sessions(inGroup: id).map(\.id)
+        for sessionID in groupSessionIDs {
             sessionGroupAssignments.removeValue(forKey: sessionID)
         }
 
-        if ungroupedGraph.rootPane == nil {
-            ungroupedGraph = normalize(
-                normalizedDeletedGraph,
-                allowedSessionIDs: Set(sessions(inGroup: nil).map(\.id)),
-                preferredSessionID: activeSessionID
-            )
-        }
-
         sessionGroups.remove(at: index)
+
+        ungroupedGraph = normalize(
+            ungroupedGraph,
+            allowedSessionIDs: Set(sessions(inGroup: nil).map(\.id)),
+            preferredSessionID: activeSessionID
+        )
 
         if activeGroupID == nil {
             workspaceGraph = normalize(
@@ -462,6 +479,61 @@ public final class SessionWorkspace: ObservableObject {
         }
         sessionGroups[index].colorTag = colorTag
         return true
+    }
+
+    @discardableResult
+    public func closeDoneSessions(inGroup groupID: UUID?) -> Int {
+        let targets = sessions(inGroup: groupID)
+            .filter { $0.agentStatus == .done }
+            .map(\.id)
+
+        var closedCount = 0
+        for sessionID in targets where closeSession(id: sessionID) {
+            closedCount += 1
+        }
+        return closedCount
+    }
+
+    @discardableResult
+    public func closeAllSessions(inGroup groupID: UUID?) -> Int {
+        let targets = sessions(inGroup: groupID).map(\.id)
+        let shouldKeepActiveScopePopulated = groupID == activeGroupID
+
+        var closedCount = 0
+        for sessionID in targets where closeSession(id: sessionID) {
+            closedCount += 1
+        }
+
+        if shouldKeepActiveScopePopulated, sessions(inGroup: groupID).isEmpty {
+            _ = createSession(selectNewSession: true)
+        }
+
+        return closedCount
+    }
+
+    @discardableResult
+    public func moveAllSessions(fromGroup sourceGroupID: UUID?, toGroup targetGroupID: UUID?) -> Int {
+        guard sourceGroupID != targetGroupID else {
+            return 0
+        }
+
+        let targets = sessions(inGroup: sourceGroupID).map(\.id)
+        var movedCount = 0
+        for sessionID in targets where assignSession(id: sessionID, toGroup: targetGroupID) {
+            movedCount += 1
+        }
+        return movedCount
+    }
+
+    @discardableResult
+    public func collapseOtherGroups(excluding preservedGroupID: UUID?) -> Int {
+        var collapsedCount = 0
+        for group in sessionGroups where group.id != preservedGroupID && !group.isCollapsed {
+            if setGroupCollapsed(id: group.id, isCollapsed: true) {
+                collapsedCount += 1
+            }
+        }
+        return collapsedCount
     }
 
     public func aggregatedAgentStatus(forGroup groupID: UUID) -> SessionAgentStatus {
@@ -599,7 +671,11 @@ public final class SessionWorkspace: ObservableObject {
             return false
         }
 
-        guard activeGroupID != id else {
+        if activeGroupID == id {
+            if id != nil, sessions(inGroup: id).isEmpty {
+                createSession(selectNewSession: true)
+                return true
+            }
             return false
         }
 
@@ -618,6 +694,11 @@ public final class SessionWorkspace: ObservableObject {
         setBackingGraph(normalizedGraph, for: id)
         synchronizeActiveSessionID(preferredSessionID: preferredSessionID, in: id)
         scheduleGitRefresh(for: workspaceGraph.leafSessionIDs)
+
+        if id != nil, sessions(inGroup: id).isEmpty {
+            createSession(selectNewSession: true)
+        }
+
         return true
     }
 
@@ -1199,8 +1280,11 @@ public final class SessionWorkspace: ObservableObject {
         sessionGitChanges = [:]
         workspaceNote = snapshot.workspaceNote
         pendingGitRefreshSessionIDs.removeAll()
+        gitRefreshCache.removeAll()
         gitRefreshTask?.cancel()
         gitRefreshTask = nil
+        gitRefreshExecutionCount = 0
+        gitRefreshCacheHitCount = 0
         nextOrdinal = max(
             snapshot.nextOrdinal,
             (snapshot.sessions.map(\.descriptor.ordinal).max() ?? 0) + 1
@@ -1255,6 +1339,11 @@ public final class SessionWorkspace: ObservableObject {
         workspaceGraph = backingGraph(for: restoredActiveGroupID)
         synchronizeActiveSessionID(preferredSessionID: snapshot.activeSessionID, in: restoredActiveGroupID)
         scheduleGitRefresh(for: Set(workspaceGraph.leafSessionIDs))
+
+        if restoredActiveGroupID != nil, sessions(inGroup: restoredActiveGroupID).isEmpty {
+            createSession(selectNewSession: true)
+        }
+
         return true
     }
 
@@ -1646,8 +1735,9 @@ public final class SessionWorkspace: ObservableObject {
         sessionGitChanges = updatedChanges
     }
 
-    private func scheduleGitRefresh<S: Sequence>(for sessionIDs: S) where S.Element == UUID {
-        let validSessionIDs = Set(sessionIDs.filter { runtimes[$0] != nil })
+    func scheduleGitRefresh<S: Sequence>(for sessionIDs: S) where S.Element == UUID {
+        let refreshScope = refreshableGitSessionIDs()
+        let validSessionIDs = Set(sessionIDs.filter { runtimes[$0] != nil && refreshScope.contains($0) })
         guard !validSessionIDs.isEmpty else {
             return
         }
@@ -1695,11 +1785,16 @@ public final class SessionWorkspace: ObservableObject {
             return (sessionID, workingDirectoryPath)
         }
 
+        let gitRootResolver = self.gitRootResolver
+        let gitChangeSummaryResolver = self.gitChangeSummaryResolver
+        let gitRefreshCache = self.gitRefreshCache
+        let gitRefreshCacheTTL = self.gitRefreshCacheTTL
+
         let refreshedContext = await Task.detached(priority: .utility) {
             var groupedSessionIDs: [String: [UUID]] = [:]
 
             for (sessionID, workingDirectoryPath) in requestContexts {
-                guard let gitRoot = WorkspaceMetadataSnapshot.gitRoot(for: workingDirectoryPath) else {
+                guard let gitRoot = gitRootResolver(workingDirectoryPath) else {
                     continue
                 }
 
@@ -1707,24 +1802,56 @@ public final class SessionWorkspace: ObservableObject {
             }
 
             var refreshedChanges: [UUID: WorkspaceGitChangeSummary] = [:]
+            var refreshedCacheEntries: [String: GitRefreshCacheEntry] = [:]
+            var cacheHitCount = 0
+            var executionCount = 0
+            let now = Date()
             for (gitRoot, sessionIDs) in groupedSessionIDs {
-                guard let summary = WorkspaceMetadataSnapshot.gitWorkingTreeDelta(workingDirectory: gitRoot) else {
-                    continue
+                let summary: WorkspaceGitChangeSummary?
+                if let cachedEntry = gitRefreshCache[gitRoot],
+                   cachedEntry.isValid(at: now, ttl: gitRefreshCacheTTL) {
+                    summary = cachedEntry.summary
+                    refreshedCacheEntries[gitRoot] = cachedEntry
+                    cacheHitCount += 1
+                } else {
+                    summary = gitChangeSummaryResolver(gitRoot)
+                    refreshedCacheEntries[gitRoot] = GitRefreshCacheEntry(
+                        summary: summary,
+                        refreshedAt: now
+                    )
+                    executionCount += 1
                 }
 
-                for sessionID in sessionIDs {
-                    refreshedChanges[sessionID] = summary
+                if let summary {
+                    for sessionID in sessionIDs {
+                        refreshedChanges[sessionID] = summary
+                    }
                 }
             }
 
             let sessionIDsWithGitRoots = Set(groupedSessionIDs.values.flatMap { $0 })
-            return (refreshedChanges, sessionIDsWithGitRoots)
+            return (
+                refreshedChanges,
+                sessionIDsWithGitRoots,
+                refreshedCacheEntries,
+                executionCount,
+                cacheHitCount
+            )
         }.value
 
-        let (refreshedChanges, sessionIDsWithGitRoots) = refreshedContext
+        let (
+            refreshedChanges,
+            sessionIDsWithGitRoots,
+            refreshedCacheEntries,
+            executionCount,
+            cacheHitCount
+        ) = refreshedContext
         let clearedSessionIDs = Set(descriptorSnapshot.keys).subtracting(sessionIDsWithGitRoots)
 
         var updatedChanges = sessionGitChanges
+        self.gitRefreshCache.merge(refreshedCacheEntries) { _, new in new }
+        gitRefreshExecutionCount += executionCount
+        gitRefreshCacheHitCount += cacheHitCount
         for sessionID in clearedSessionIDs {
             updatedChanges.removeValue(forKey: sessionID)
         }
@@ -1739,6 +1866,11 @@ public final class SessionWorkspace: ObservableObject {
 
         for sessionID in sessionIDsWithGitRoots where refreshedChanges[sessionID] == nil {
             updatedChanges.removeValue(forKey: sessionID)
+        }
+
+        guard sessionGitChanges != updatedChanges else {
+            gitRefreshTask = nil
+            return
         }
 
         sessionGitChanges = updatedChanges
@@ -1834,5 +1966,13 @@ public final class SessionWorkspace: ObservableObject {
     private func invalidateCachedWorkspaceMetadata() {
         cachedWorkspaceMetadata = nil
         isWorkspaceMetadataDirty = true
+    }
+
+    private func refreshableGitSessionIDs() -> Set<UUID> {
+        var sessionIDs = Set(workspaceGraph.leafSessionIDs)
+        if let activeSessionID, runtimes[activeSessionID] != nil {
+            sessionIDs.insert(activeSessionID)
+        }
+        return sessionIDs
     }
 }

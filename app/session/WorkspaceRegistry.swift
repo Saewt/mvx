@@ -14,6 +14,8 @@ public struct WorkspaceEntry: Identifiable, Equatable {
 public struct WorkspaceCardMetadata: Equatable {
     public let workspaceID: UUID
     public let name: String
+    public let sessionCount: Int
+    public let groupCount: Int
     public let branchName: String
     public let paneCount: Int
     public let notificationCount: Int
@@ -25,6 +27,8 @@ public struct WorkspaceCardMetadata: Equatable {
     public init(
         workspaceID: UUID,
         name: String,
+        sessionCount: Int = 0,
+        groupCount: Int = 0,
         branchName: String,
         paneCount: Int,
         notificationCount: Int,
@@ -35,6 +39,8 @@ public struct WorkspaceCardMetadata: Equatable {
     ) {
         self.workspaceID = workspaceID
         self.name = name
+        self.sessionCount = max(sessionCount, 0)
+        self.groupCount = max(groupCount, 0)
         self.branchName = branchName
         self.paneCount = max(paneCount, 0)
         self.notificationCount = max(notificationCount, 0)
@@ -89,9 +95,16 @@ public final class WorkspaceRegistry: ObservableObject {
     @Published public private(set) var activeWorkspaceID: UUID?
 
     private var workspaces: [UUID: SessionWorkspace]
+    private var autosaveControllers: [UUID: WorkspaceAutosaveController]
+    private let persistence: WorkspacePersistence?
+    private let autosaveDebounceInterval: DispatchQueue.SchedulerTimeType.Stride
+    private let autosaveScheduler: DispatchQueue
     private let workspaceFactory: (String) -> SessionWorkspace
 
     public init(
+        persistence: WorkspacePersistence? = nil,
+        autosaveDebounceInterval: DispatchQueue.SchedulerTimeType.Stride = .milliseconds(500),
+        autosaveScheduler: DispatchQueue = .main,
         workspaceFactory: @escaping @MainActor (String) -> SessionWorkspace = { @MainActor _ in
             SessionWorkspace(
                 startsWithSession: false,
@@ -102,6 +115,10 @@ public final class WorkspaceRegistry: ObservableObject {
         self.entries = []
         self.activeWorkspaceID = nil
         self.workspaces = [:]
+        self.autosaveControllers = [:]
+        self.persistence = persistence
+        self.autosaveDebounceInterval = autosaveDebounceInterval
+        self.autosaveScheduler = autosaveScheduler
         self.workspaceFactory = workspaceFactory
     }
 
@@ -121,6 +138,8 @@ public final class WorkspaceRegistry: ObservableObject {
         return WorkspaceCardMetadata(
             workspaceID: entry.id,
             name: entry.name,
+            sessionCount: workspace.sessions.count,
+            groupCount: workspace.sessionGroups.count,
             branchName: metadata.branchName,
             paneCount: metadata.paneCount,
             notificationCount: metadata.notificationCount,
@@ -141,40 +160,64 @@ public final class WorkspaceRegistry: ObservableObject {
         let workspace = workspaceFactory(name)
         entries.append(entry)
         workspaces[entry.id] = workspace
+        attachAutosaveController(for: entry.id, workspace: workspace)
 
         if activate || activeWorkspaceID == nil {
+            flushActiveWorkspace()
             activeWorkspaceID = entry.id
         }
 
+        persistRegistryAndActiveMirror()
         return entry
     }
 
     @discardableResult
     public func activateWorkspace(id: UUID) -> Bool {
         guard workspaces[id] != nil else { return false }
+        guard activeWorkspaceID != id else { return true }
+        flushActiveWorkspace()
         activeWorkspaceID = id
+        persistRegistryAndActiveMirror()
         return true
     }
 
     @discardableResult
     public func closeWorkspace(id: UUID) -> Bool {
-        guard let index = entries.firstIndex(where: { $0.id == id }) else { return false }
+        guard entries.count > 1,
+              let index = entries.firstIndex(where: { $0.id == id }) else { return false }
 
+        flushWorkspace(id: id)
         entries.remove(at: index)
         workspaces.removeValue(forKey: id)
+        autosaveControllers.removeValue(forKey: id)
 
         if activeWorkspaceID == id {
             activeWorkspaceID = entries.first?.id
         }
 
+        persistRegistryAndActiveMirror()
         return true
     }
 
     @discardableResult
     public func renameWorkspace(id: UUID, name: String) -> Bool {
         guard let index = entries.firstIndex(where: { $0.id == id }) else { return false }
-        entries[index].name = name
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else { return false }
+        guard entries[index].name != trimmedName else { return false }
+        entries[index].name = trimmedName
+        persistRegistryAndActiveMirror()
         return true
+    }
+
+    public func persistAll() throws {
+        for entry in entries {
+            guard let workspace = workspaces[entry.id] else { continue }
+            try persistSnapshot(workspace.snapshot(), for: entry.id)
+        }
+
+        try saveRegistrySnapshot()
+        try saveActiveWorkspaceMirror()
     }
 
     public func registrySnapshot() -> RegistrySnapshot {
@@ -199,6 +242,7 @@ public final class WorkspaceRegistry: ObservableObject {
 
         entries.removeAll()
         workspaces.removeAll()
+        autosaveControllers.removeAll()
         activeWorkspaceID = nil
 
         for persisted in snapshot.workspaces {
@@ -207,6 +251,7 @@ public final class WorkspaceRegistry: ObservableObject {
             _ = workspace.restore(from: persisted.workspaceSnapshot)
             entries.append(entry)
             workspaces[entry.id] = workspace
+            attachAutosaveController(for: entry.id, workspace: workspace)
         }
 
         if let snapshotActiveID = snapshot.activeWorkspaceID, workspaces[snapshotActiveID] != nil {
@@ -216,5 +261,59 @@ public final class WorkspaceRegistry: ObservableObject {
         }
 
         return true
+    }
+
+    private func attachAutosaveController(for id: UUID, workspace: SessionWorkspace) {
+        guard persistence != nil else { return }
+
+        autosaveControllers[id] = WorkspaceAutosaveController(
+            workspace: workspace,
+            debounceInterval: autosaveDebounceInterval,
+            scheduler: autosaveScheduler,
+            persistSnapshot: { [weak self] snapshot in
+                guard let self else { return }
+                try self.persistSnapshot(snapshot, for: id)
+            }
+        )
+    }
+
+    private func flushActiveWorkspace() {
+        guard let activeWorkspaceID else { return }
+        flushWorkspace(id: activeWorkspaceID)
+    }
+
+    private func flushWorkspace(id: UUID) {
+        guard let workspace = workspaces[id] else { return }
+        do {
+            try persistSnapshot(workspace.snapshot(), for: id)
+        } catch {
+            return
+        }
+    }
+
+    private func persistRegistryAndActiveMirror() {
+        do {
+            try saveRegistrySnapshot()
+            try saveActiveWorkspaceMirror()
+        } catch {
+            return
+        }
+    }
+
+    private func persistSnapshot(_ snapshot: WorkspaceSnapshot, for id: UUID) throws {
+        guard persistence != nil else { return }
+        try saveRegistrySnapshot()
+        if activeWorkspaceID == id {
+            try persistence?.save(snapshot)
+        }
+    }
+
+    private func saveRegistrySnapshot() throws {
+        try persistence?.saveRegistry(registrySnapshot())
+    }
+
+    private func saveActiveWorkspaceMirror() throws {
+        guard let activeWorkspace else { return }
+        try persistence?.save(activeWorkspace.snapshot())
     }
 }

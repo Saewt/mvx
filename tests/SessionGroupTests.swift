@@ -42,7 +42,8 @@ final class SessionGroupTests: XCTestCase {
 
         XCTAssertTrue(workspace.deleteGroup(id: second.id))
         XCTAssertEqual(workspace.sessionGroups.map(\.id), [third.id, first.id])
-        XCTAssertNil(workspace.sessionGroupAssignments[sessionID])
+        XCTAssertNotNil(workspace.descriptor(for: sessionID))
+        XCTAssertTrue(workspace.sessions(inGroup: nil).map(\.id).contains(sessionID))
         XCTAssertFalse(workspace.deleteGroup(id: second.id))
     }
 
@@ -151,5 +152,89 @@ final class SessionGroupTests: XCTestCase {
         // Clear
         XCTAssertTrue(workspace.setGroupColorTag(id: group.id, colorTag: nil))
         XCTAssertNil(workspace.sessionGroups.first?.colorTag)
+    }
+
+    func testCloseDoneSessionsOnlyRemovesDoneSessionsInRequestedGroup() throws {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+        let firstID = try XCTUnwrap(workspace.activeSessionID)
+        let doneInGroup = workspace.createSession(selectNewSession: false)
+        let runningInGroup = workspace.createSession(selectNewSession: false)
+        let doneOutsideGroup = workspace.createSession(selectNewSession: false)
+        let group = workspace.createGroup(name: "Frontend", colorTag: nil)
+
+        XCTAssertTrue(workspace.assignSession(id: firstID, toGroup: group.id))
+        XCTAssertTrue(workspace.assignSession(id: doneInGroup.id, toGroup: group.id))
+        XCTAssertTrue(workspace.assignSession(id: runningInGroup.id, toGroup: group.id))
+        XCTAssertTrue(workspace.updateAgentStatus(id: firstID, status: .done))
+        XCTAssertTrue(workspace.updateAgentStatus(id: doneInGroup.id, status: .done))
+        XCTAssertTrue(workspace.updateAgentStatus(id: runningInGroup.id, status: .running))
+        XCTAssertTrue(workspace.updateAgentStatus(id: doneOutsideGroup.id, status: .done))
+
+        let closedCount = workspace.closeDoneSessions(inGroup: group.id)
+
+        XCTAssertEqual(closedCount, 2)
+        XCTAssertEqual(workspace.sessions(inGroup: group.id).map(\.id), [runningInGroup.id])
+        XCTAssertNotNil(workspace.descriptor(for: doneOutsideGroup.id))
+    }
+
+    func testCloseAllSessionsInActiveGroupCreatesReplacementInSameGroup() throws {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+        let firstID = try XCTUnwrap(workspace.activeSessionID)
+        let second = workspace.createSession(selectNewSession: false)
+        let outside = workspace.createSession(selectNewSession: false)
+        let group = workspace.createGroup(name: "Frontend", colorTag: nil)
+
+        XCTAssertTrue(workspace.assignSession(id: firstID, toGroup: group.id))
+        XCTAssertTrue(workspace.assignSession(id: second.id, toGroup: group.id))
+        XCTAssertTrue(workspace.selectGroup(id: group.id))
+
+        let closedCount = workspace.closeAllSessions(inGroup: group.id)
+        let remainingInGroup = workspace.sessions(inGroup: group.id)
+
+        XCTAssertEqual(closedCount, 2)
+        XCTAssertEqual(remainingInGroup.count, 1)
+        XCTAssertNotEqual(remainingInGroup.first?.id, firstID)
+        XCTAssertNotEqual(remainingInGroup.first?.id, second.id)
+        XCTAssertNotNil(workspace.descriptor(for: outside.id))
+        XCTAssertEqual(workspace.activeGroupID, group.id)
+    }
+
+    func testCloseAllSessionsInInactiveGroupLeavesGroupEmpty() throws {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+        let firstID = try XCTUnwrap(workspace.activeSessionID)
+        let grouped = workspace.createSession(selectNewSession: false)
+        let group = workspace.createGroup(name: "Backend", colorTag: nil)
+
+        XCTAssertTrue(workspace.assignSession(id: grouped.id, toGroup: group.id))
+        XCTAssertNil(workspace.activeGroupID)
+
+        let closedCount = workspace.closeAllSessions(inGroup: group.id)
+
+        XCTAssertEqual(closedCount, 1)
+        XCTAssertEqual(workspace.sessions(inGroup: group.id), [])
+        XCTAssertEqual(workspace.sessions(inGroup: nil).map(\.id), [firstID])
+    }
+
+    func testMoveAllSessionsAndCollapseOtherGroupsComposeExistingPrimitives() throws {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+        let firstID = try XCTUnwrap(workspace.activeSessionID)
+        let second = workspace.createSession(selectNewSession: false)
+        let third = workspace.createSession(selectNewSession: false)
+        let preserved = workspace.createGroup(name: "Preserved", colorTag: nil)
+        let collapsed = workspace.createGroup(name: "Already Collapsed", colorTag: nil)
+        let target = workspace.createGroup(name: "Target", colorTag: nil)
+
+        XCTAssertTrue(workspace.assignSession(id: firstID, toGroup: preserved.id))
+        XCTAssertTrue(workspace.assignSession(id: second.id, toGroup: preserved.id))
+        XCTAssertTrue(workspace.assignSession(id: third.id, toGroup: target.id))
+        XCTAssertTrue(workspace.setGroupCollapsed(id: collapsed.id, isCollapsed: true))
+
+        XCTAssertEqual(workspace.moveAllSessions(fromGroup: preserved.id, toGroup: nil), 2)
+        XCTAssertEqual(workspace.sessions(inGroup: nil).map(\.id), [firstID, second.id])
+
+        XCTAssertEqual(workspace.collapseOtherGroups(excluding: preserved.id), 1)
+        XCTAssertFalse(try XCTUnwrap(workspace.sessionGroups.first { $0.id == preserved.id }).isCollapsed)
+        XCTAssertTrue(try XCTUnwrap(workspace.sessionGroups.first { $0.id == collapsed.id }).isCollapsed)
+        XCTAssertTrue(try XCTUnwrap(workspace.sessionGroups.first { $0.id == target.id }).isCollapsed)
     }
 }

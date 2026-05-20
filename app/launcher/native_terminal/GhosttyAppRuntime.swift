@@ -17,6 +17,7 @@ final class GhosttyAppRuntime {
     private var didAttemptStart = false
     private var lifecycleObservers: [NSObjectProtocol] = []
     private var config: ghostty_config_t?
+    private var tickScheduled = false
 
     private init() {}
 
@@ -65,7 +66,7 @@ final class GhosttyAppRuntime {
             }
 
             DispatchQueue.main.async {
-                runtime.tickIfNeeded()
+                runtime.scheduleTickIfNeeded()
             }
         }
         runtimeConfig.action_cb = { _, target, action in
@@ -128,6 +129,22 @@ final class GhosttyAppRuntime {
         }
 
         ghostty_app_tick(app)
+    }
+
+    func scheduleTickIfNeeded() {
+        guard let app else {
+            return
+        }
+
+        guard !tickScheduled else {
+            return
+        }
+
+        tickScheduled = true
+        DispatchQueue.main.async { [weak self] in
+            self?.tickScheduled = false
+            self?.tickIfNeeded()
+        }
     }
 
     func registerAppLifecycleObservers() {

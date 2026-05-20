@@ -34,7 +34,7 @@ final class NativeGhosttyNSView: NSView {
     deinit {
         clearWindowObservers()
         NativeGhosttyGeometryCoordinator.shared.unregister(self)
-        runtime?.detach(from: self)
+        runtime?.detach(from: self, treatAsTransient: false)
     }
 
     @available(*, unavailable)
@@ -115,8 +115,7 @@ final class NativeGhosttyNSView: NSView {
     }
 
     func dismantle() {
-        runtime?.beginTransientMove()
-        runtime?.detach(from: self)
+        runtime?.detach(from: self, treatAsTransient: false)
         runtime = nil
         onFocusRequest = nil
         clearWindowObservers()
@@ -294,8 +293,7 @@ final class NativeGhosttyNSView: NSView {
             return
         }
 
-        runtime?.beginTransientMove()
-        runtime?.detach(from: self)
+        runtime?.detach(from: self, treatAsTransient: false)
         runtime = newRuntime
     }
 
@@ -314,10 +312,6 @@ final class NativeGhosttyNSView: NSView {
         runtime?.setVisible(!isHidden)
 
         let isStable = runtime?.reconcileGeometry(in: self, forceRefresh: forceRefresh) ?? true
-        if forceRefresh {
-            runtime?.forceRefresh()
-        }
-
         return isStable
     }
 

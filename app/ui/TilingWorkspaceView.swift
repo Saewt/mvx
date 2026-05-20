@@ -1,6 +1,35 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
+public struct TilingWorkspaceGeometryState: Equatable {
+    public let paneCount: Int
+    public let focusedPaneID: UUID?
+    public let visibleAxes: [WorkspaceSplitAxis]
+
+    @MainActor
+    public static func resolve(workspace: SessionWorkspace) -> TilingWorkspaceGeometryState {
+        let rootPane = workspace.workspaceGraph.rootPane
+        return TilingWorkspaceGeometryState(
+            paneCount: workspace.workspaceGraph.paneCount,
+            focusedPaneID: workspace.focusedPaneID,
+            visibleAxes: rootPane.map(axes(in:)) ?? []
+        )
+    }
+
+    private static func axes(in node: WorkspacePaneNode) -> [WorkspaceSplitAxis] {
+        var result: [WorkspaceSplitAxis] = []
+        if let axis = node.axis {
+            result.append(axis)
+        }
+
+        for child in node.children {
+            result.append(contentsOf: axes(in: child))
+        }
+
+        return result
+    }
+}
+
 public struct TilingWorkspaceLayoutState: Equatable {
     public let paneCount: Int
     public let focusedPaneID: UUID?
@@ -126,7 +155,7 @@ private struct PaneDropDelegate: DropDelegate {
 @MainActor
 public struct TilingWorkspaceView: View {
     @ObservedObject private var workspace: SessionWorkspace
-    @State private var lastObservedLayoutState: TilingWorkspaceLayoutState?
+    @State private var lastObservedGeometryState: TilingWorkspaceGeometryState?
     @State private var activeDropTarget: PaneDropTargetState?
     private let terminalHostFactory: TerminalHostFactory
     private let dividerThickness: CGFloat = 6
@@ -140,7 +169,7 @@ public struct TilingWorkspaceView: View {
     }
 
     public var body: some View {
-        let layoutState = TilingWorkspaceLayoutState.resolve(workspace: workspace)
+        let geometryState = TilingWorkspaceGeometryState.resolve(workspace: workspace)
 
         Group {
             if let rootPane = workspace.workspaceGraph.rootPane {
@@ -155,12 +184,12 @@ public struct TilingWorkspaceView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(Color(red: 0.07, green: 0.08, blue: 0.09))
         .onAppear {
-            scheduleNativeGeometryReconcile(from: lastObservedLayoutState, to: layoutState)
-            lastObservedLayoutState = layoutState
+            scheduleNativeGeometryReconcile(from: lastObservedGeometryState, to: geometryState)
+            lastObservedGeometryState = geometryState
         }
-        .onChange(of: layoutState) { newLayoutState in
-            scheduleNativeGeometryReconcile(from: lastObservedLayoutState, to: newLayoutState)
-            lastObservedLayoutState = newLayoutState
+        .onChange(of: geometryState) { newGeometryState in
+            scheduleNativeGeometryReconcile(from: lastObservedGeometryState, to: newGeometryState)
+            lastObservedGeometryState = newGeometryState
         }
     }
 
@@ -496,8 +525,8 @@ public struct TilingWorkspaceView: View {
     }
 
     private func scheduleNativeGeometryReconcile(
-        from previous: TilingWorkspaceLayoutState?,
-        to current: TilingWorkspaceLayoutState
+        from previous: TilingWorkspaceGeometryState?,
+        to current: TilingWorkspaceGeometryState
     ) {
         terminalHostFactory.scheduleGeometryReconcile()
 
