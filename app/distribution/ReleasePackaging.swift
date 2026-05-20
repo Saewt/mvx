@@ -5,10 +5,10 @@ public enum DistributionDefaults {
     public static let appName = "mvx"
     public static let appBundleName = "mvx.app"
     public static let defaultMinimumMacOS = "13.0"
-    public static let defaultVersion = "0.1.3"
-    public static let defaultBuild = "3"
-    public static let defaultDownloadBaseURL = "https://downloads.example.com/mvx"
-    public static let defaultAppcastURL = "\(defaultDownloadBaseURL)/appcast.xml"
+    public static let defaultVersion = "0.1.4"
+    public static let defaultBuild = "4"
+    public static let defaultDownloadBaseURL = "https://github.com/Saewt/mvx/releases/latest/download"
+    public static let defaultLatestReleaseURL = "https://github.com/Saewt/mvx/releases/latest/download/latest.json"
 }
 
 public struct ReleasePackagingManifest: Codable, Equatable {
@@ -16,9 +16,8 @@ public struct ReleasePackagingManifest: Codable, Equatable {
     public var build: String
     public var bundleIdentifier: String
     public var appBundleName: String
-    public var dmgFileName: String
+    public var tarballFileName: String
     public var downloadURL: String
-    public var appcastURL: String?
     public var requiresNotarization: Bool
     public var hardenedRuntimeEnabled: Bool
 
@@ -27,9 +26,8 @@ public struct ReleasePackagingManifest: Codable, Equatable {
         build: String,
         bundleIdentifier: String,
         appBundleName: String,
-        dmgFileName: String,
+        tarballFileName: String,
         downloadURL: String,
-        appcastURL: String?,
         requiresNotarization: Bool,
         hardenedRuntimeEnabled: Bool
     ) {
@@ -37,9 +35,8 @@ public struct ReleasePackagingManifest: Codable, Equatable {
         self.build = build
         self.bundleIdentifier = bundleIdentifier
         self.appBundleName = appBundleName
-        self.dmgFileName = dmgFileName
+        self.tarballFileName = tarballFileName
         self.downloadURL = downloadURL
-        self.appcastURL = appcastURL
         self.requiresNotarization = requiresNotarization
         self.hardenedRuntimeEnabled = hardenedRuntimeEnabled
     }
@@ -76,27 +73,25 @@ public struct ReleaseArtifactDescriptor: Codable, Equatable {
         "mvx-\(sanitizedVersion)-release"
     }
 
-    public var dmgFileName: String {
-        "mvx-\(sanitizedVersion).dmg"
+    public var tarballFileName: String {
+        "mvx-\(sanitizedVersion)-\(sanitizedBuild)-darwin-aarch64.app.tar.gz"
     }
 
     public var downloadURLString: String {
-        "\(downloadBaseURL)/\(dmgFileName)"
+        "\(downloadBaseURL)/\(tarballFileName)"
     }
 
     public func packagingManifest(
-        bundleIdentifier: String = DistributionDefaults.bundleIdentifier,
-        appcastURL: String? = DistributionDefaults.defaultAppcastURL
+        bundleIdentifier: String = DistributionDefaults.bundleIdentifier
     ) -> ReleasePackagingManifest {
         ReleasePackagingManifest(
             version: version,
             build: build,
             bundleIdentifier: bundleIdentifier,
             appBundleName: DistributionDefaults.appBundleName,
-            dmgFileName: dmgFileName,
+            tarballFileName: tarballFileName,
             downloadURL: downloadURLString,
-            appcastURL: appcastURL,
-            requiresNotarization: true,
+            requiresNotarization: false,
             hardenedRuntimeEnabled: true
         )
     }

@@ -1,174 +1,160 @@
-#!/bin/sh
-set -eu
+#!/usr/bin/env bash
+set -euo pipefail
 
-ROOT_DIR=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
-VERSION=${MVX_RELEASE_VERSION:-0.1.3}
-BUILD=${MVX_BUILD_NUMBER:-3}
-OUTPUT_DIR=${MVX_OUTPUT_DIR:-"$ROOT_DIR/.build/release"}
-DERIVED_DATA=${MVX_DERIVED_DATA:-"$ROOT_DIR/.build/DerivedData"}
-ARCHIVE_PATH="$OUTPUT_DIR/mvx-$VERSION-$BUILD.xcarchive"
-EXPORT_DIR="$OUTPUT_DIR/mvx-$VERSION-export"
-STAGING_DIR="$OUTPUT_DIR/mvx-$VERSION-release"
-DMG_PATH="$OUTPUT_DIR/mvx-$VERSION.dmg"
-APP_NAME=${MVX_APP_NAME:-mvx.app}
-ALLOW_UNSIGNED=${MVX_ALLOW_UNSIGNED:-0}
-DEVELOPER_ID_APPLICATION=${MVX_DEVELOPER_ID_APPLICATION:--}
-ARCHIVE_DESTINATION=${MVX_ARCHIVE_DESTINATION:-platform=macOS,arch=$(uname -m)}
-ARCHIVE_ARCHS=${MVX_ARCHIVE_ARCHS:-$(uname -m)}
+# release-build — build mvx for release, stamp version, produce tarball + latest.json
+#
+# Required environment:
+#   MVX_RELEASE_VERSION  — e.g. 0.1.5
+#   MVX_BUILD_NUMBER     — e.g. 5
+#
+# Optional:
+#   MVX_BUILD_DMG        — set to 0 to skip DMG creation (useful for CI)
+#   MVX_ARCHIVE_DESTINATION — xcodebuild export destination specifier
+#   MVX_ARCHIVE_ARCHS    — architectures to include in the archive
 
-require_command() {
-  if ! command -v "$1" >/dev/null 2>&1; then
-    echo "Missing required command: $1" >&2
+VERSION="${MVX_RELEASE_VERSION:?MVX_RELEASE_VERSION is required}"
+BUILD="${MVX_BUILD_NUMBER:?MVX_BUILD_NUMBER is required}"
+BUILD_DMG="${MVX_BUILD_DMG:-1}"
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+PROJECT_FILE="$PROJECT_ROOT/mvx.xcodeproj"
+ARCHIVE_DEST="$PROJECT_ROOT/.build/release/mvx.xcarchive"
+EXPORT_DEST="$PROJECT_ROOT/.build/release/export"
+STAGING_DIR="$PROJECT_ROOT/.build/release/staging"
+
+echo "==> Building mvx $VERSION ($BUILD)"
+
+# Ensure xcodegen has run so the project file is current.
+if command -v xcodegen &>/dev/null; then
+    echo "==> Regenerating Xcode project from project.yml"
+    xcodegen generate --project "$PROJECT_ROOT"
+fi
+
+# Clean previous build artifacts.
+rm -rf "$ARCHIVE_DEST" "$EXPORT_DEST" "$STAGING_DIR"
+mkdir -p "$EXPORT_DEST" "$STAGING_DIR"
+
+# Build archive with version overrides.
+ARCHIVE_LOG="$PROJECT_ROOT/.build/release/xcodebuild-archive.log"
+xcodebuild archive \
+    -project "$PROJECT_FILE" \
+    -scheme Mvx \
+    -configuration Release \
+    -archivePath "$ARCHIVE_DEST" \
+    -destination "${MVX_ARCHIVE_DESTINATION:-generic/platform=macOS}" \
+    MARKETING_VERSION="$VERSION" \
+    CURRENT_PROJECT_VERSION="$BUILD" \
+    ARCHS="${MVX_ARCHIVE_ARCHS:-arm64}" \
+    CODE_SIGN_IDENTITY="-" \
+    CODE_SIGNING_REQUIRED=YES \
+    DEVELOPMENT_TEAM="" \
+    SKIP_INSTALL=NO \
+    | tee "$ARCHIVE_LOG"
+
+# Copy the archived app bundle into the export directory. This avoids
+# `xcodebuild -exportArchive` distribution-method churn for direct-distribution
+# macOS apps while still giving us a concrete app bundle to sign and package.
+ARCHIVED_APP="$ARCHIVE_DEST/Products/Applications/mvx.app"
+APP_BUNDLE="$EXPORT_DEST/mvx.app"
+
+if [ ! -d "$ARCHIVED_APP" ]; then
+    echo "ERROR: Archived app bundle not found at $ARCHIVED_APP" >&2
     exit 1
-  fi
-}
+fi
 
-sign_path() {
-  PATH_TO_SIGN=$1
+echo "==> Copying archived app bundle"
+cp -R "$ARCHIVED_APP" "$APP_BUNDLE"
 
-  echo "==> Signing $(basename "$PATH_TO_SIGN")"
-  if [ "$DEVELOPER_ID_APPLICATION" != "-" ]; then
-    codesign \
-      --force \
-      --timestamp \
-      --options runtime \
-      --sign "$DEVELOPER_ID_APPLICATION" \
-      "$PATH_TO_SIGN"
-  else
-    codesign \
-      --force \
-      --sign "-" \
-      "$PATH_TO_SIGN"
-  fi
-}
-
-sign_app_bundle() {
-  APP_BUNDLE=$1
-  FRAMEWORKS_DIR="$APP_BUNDLE/Contents/Frameworks"
-  PLUGINS_DIR="$APP_BUNDLE/Contents/PlugIns"
-
-  xattr -cr "$APP_BUNDLE"
-
-  if [ -d "$FRAMEWORKS_DIR" ]; then
-    find "$FRAMEWORKS_DIR" -type f \( -name "*.dylib" -o -name "*.so" \) -print | sort | while IFS= read -r nested_file; do
-      sign_path "$nested_file"
-    done
-
-    find "$FRAMEWORKS_DIR" -depth -type d \( -name "*.framework" -o -name "*.bundle" -o -name "*.xpc" -o -name "*.appex" -o -name "*.app" \) -print | sort | while IFS= read -r nested_bundle; do
-      sign_path "$nested_bundle"
-    done
-  fi
-
-  if [ -d "$PLUGINS_DIR" ]; then
-    find "$PLUGINS_DIR" -depth -type d \( -name "*.bundle" -o -name "*.xpc" -o -name "*.appex" -o -name "*.app" \) -print | sort | while IFS= read -r plugin_bundle; do
-      sign_path "$plugin_bundle"
-    done
-  fi
-
-  sign_path "$APP_BUNDLE"
-
-  echo "==> Verifying app signature"
-  codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE"
-
-  if [ "$DEVELOPER_ID_APPLICATION" != "-" ]; then
-    spctl -a -vv -t execute "$APP_BUNDLE"
-  else
-    echo "    (skipping spctl — ad-hoc signatures are not accepted by Gatekeeper)"
-  fi
-}
-
-mkdir -p "$OUTPUT_DIR"
-rm -rf "$ARCHIVE_PATH" "$EXPORT_DIR" "$STAGING_DIR"
-
-ARCHIVE_ARGS=""
-if [ "$ALLOW_UNSIGNED" = "1" ]; then
-  ARCHIVE_ARGS="CODE_SIGNING_ALLOWED=NO"
-else
-  require_command codesign
-  require_command spctl
-  require_command xattr
-
-  if [ -z "$DEVELOPER_ID_APPLICATION" ]; then
-    echo "MVX_DEVELOPER_ID_APPLICATION is required when MVX_ALLOW_UNSIGNED=0." >&2
+# Verify the exported app bundle exists.
+if [ ! -d "$APP_BUNDLE" ]; then
+    echo "ERROR: mvx.app not found at $APP_BUNDLE" >&2
     exit 1
-  fi
-
-  # Keep archive output deterministic and apply Developer ID signing to the copied app bundle.
-  ARCHIVE_ARGS="CODE_SIGNING_ALLOWED=NO"
 fi
 
-echo "==> Archiving mvx"
-xcodebuild \
-  -project "$ROOT_DIR/mvx.xcodeproj" \
-  -scheme Mvx \
-  -configuration Release \
-  -destination "$ARCHIVE_DESTINATION" \
-  -derivedDataPath "$DERIVED_DATA" \
-  -archivePath "$ARCHIVE_PATH" \
-  "ARCHS=$ARCHIVE_ARCHS" \
-  ONLY_ACTIVE_ARCH=YES \
-  archive \
-  $ARCHIVE_ARGS
+# Verify Info.plist version/build match the expected values.
+PLIST_VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP_BUNDLE/Contents/Info.plist")
+PLIST_BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$APP_BUNDLE/Contents/Info.plist")
 
-APP_SOURCE="$ARCHIVE_PATH/Products/Applications/$APP_NAME"
-if [ ! -d "$APP_SOURCE" ]; then
-  echo "Archive missing expected app bundle: $APP_SOURCE" >&2
-  exit 1
+if [ "$PLIST_VERSION" != "$VERSION" ]; then
+    echo "ERROR: Info.plist CFBundleShortVersionString ($PLIST_VERSION) != MVX_RELEASE_VERSION ($VERSION)" >&2
+    exit 1
 fi
 
-mkdir -p "$EXPORT_DIR"
-cp -R "$APP_SOURCE" "$EXPORT_DIR/"
-
-if [ "$ALLOW_UNSIGNED" != "1" ]; then
-  sign_app_bundle "$EXPORT_DIR/$APP_NAME"
+if [ "$PLIST_BUILD" != "$BUILD" ]; then
+    echo "ERROR: Info.plist CFBundleVersion ($PLIST_BUILD) != MVX_BUILD_NUMBER ($BUILD)" >&2
+    exit 1
 fi
 
-mkdir -p "$STAGING_DIR"
-cp -R "$EXPORT_DIR/$APP_NAME" "$STAGING_DIR/"
-ln -s /Applications "$STAGING_DIR/Applications"
+echo "==> Info.plist verified: $VERSION ($BUILD)"
 
-echo "==> Building DMG"
-hdiutil create \
-  -volname "mvx" \
-  -srcfolder "$STAGING_DIR" \
-  -ov \
-  -format UDZO \
-  "$DMG_PATH" >/dev/null
+# Re-apply ad-hoc signing and verify.
+echo "==> Signing and verifying bundle"
+codesign --sign - --force --deep --strict "$APP_BUNDLE"
+codesign --verify --deep --strict "$APP_BUNDLE"
+echo "==> Bundle signature verified"
 
-if [ "$ALLOW_UNSIGNED" != "1" ]; then
-  echo "==> Signing DMG"
-  sign_path "$DMG_PATH"
+# Create the tarball.
+TARBALL_NAME="mvx-${VERSION}-${BUILD}-darwin-aarch64.app.tar.gz"
+TARBALL_PATH="$STAGING_DIR/$TARBALL_NAME"
 
-  echo "==> Verifying DMG signature"
-  codesign --verify --verbose=2 "$DMG_PATH"
+echo "==> Creating tarball: $TARBALL_NAME"
+tar -czf "$TARBALL_PATH" -C "$EXPORT_DEST" mvx.app
 
-  if [ "$DEVELOPER_ID_APPLICATION" != "-" ]; then
-    spctl -a -vv -t open "$DMG_PATH"
-  else
-    echo "    (skipping spctl — ad-hoc signatures are not accepted by Gatekeeper)"
-  fi
-fi
+# Compute SHA256.
+SHA256=$(shasum -a 256 "$TARBALL_PATH" | awk '{print $1}')
 
-MANIFEST_PATH="$OUTPUT_DIR/release-manifest.json"
-DOWNLOAD_BASE_URL=${MVX_DOWNLOAD_BASE_URL:-https://downloads.example.com/mvx}
-APPCAST_URL=${MVX_APPCAST_URL:-$DOWNLOAD_BASE_URL/appcast.xml}
+echo "==> SHA256: $SHA256"
 
-cat > "$MANIFEST_PATH" <<EOF
+# Generate latest.json.
+DOWNLOAD_URL="https://github.com/Saewt/mvx/releases/latest/download/$TARBALL_NAME"
+cat > "$STAGING_DIR/latest.json" <<LATEST
 {
   "version": "$VERSION",
   "build": "$BUILD",
-  "bundleIdentifier": "dev.mvx.app",
-  "appBundleName": "$APP_NAME",
-  "dmgFileName": "$(basename "$DMG_PATH")",
-  "downloadURL": "$DOWNLOAD_BASE_URL/$(basename "$DMG_PATH")",
-  "appcastURL": "$APPCAST_URL",
-  "requiresNotarization": true,
-  "hardenedRuntimeEnabled": true
+  "minimum_macos": "13.0",
+  "platforms": {
+    "darwin-aarch64": {
+      "url": "$DOWNLOAD_URL",
+      "sha256": "$SHA256"
+    }
+  }
 }
-EOF
+LATEST
 
-echo "Release artifact ready:"
-echo "  Archive:  $ARCHIVE_PATH"
-echo "  App:      $EXPORT_DIR/$APP_NAME"
-echo "  DMG:      $DMG_PATH"
-echo "  Manifest: $MANIFEST_PATH"
+echo "==> Generated latest.json"
+
+# Generate release-publication.json (metadata for the release).
+cat > "$STAGING_DIR/release-publication.json" <<PUB
+{
+  "version": "$VERSION",
+  "build": "$BUILD",
+  "tarball": "$TARBALL_NAME",
+  "sha256": "$SHA256",
+  "download_url": "$DOWNLOAD_URL"
+}
+PUB
+
+echo "==> Generated release-publication.json"
+
+# Optionally build a DMG for local distribution.
+if [ "$BUILD_DMG" != "0" ]; then
+    DMG_NAME="mvx-${VERSION}-${BUILD}.dmg"
+    DMG_PATH="$STAGING_DIR/$DMG_NAME"
+
+    echo "==> Creating DMG: $DMG_NAME"
+    hdiutil create -volname "mvx" \
+        -srcfolder "$EXPORT_DEST" \
+        -ov -format UDZO \
+        "$DMG_PATH"
+
+    echo "==> DMG created at $DMG_PATH"
+else
+    echo "==> Skipping DMG creation (MVX_BUILD_DMG=0)"
+fi
+
+echo ""
+echo "==> Release artifacts in $STAGING_DIR:"
+ls -lh "$STAGING_DIR"
+echo ""
+echo "==> Done. Run release-publish to upload to GitHub."

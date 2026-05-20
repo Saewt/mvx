@@ -44,16 +44,32 @@ Split any pane horizontally or vertically, resize panes by dragging dividers, an
 
 ## Install
 
-Download the latest release, open the `.dmg`, and move `mvx.app` to the `Applications` folder.
+### Quick install
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Saewt/mvx/main/scripts/install.sh | bash
+```
+
+This installs `mvx` to `~/Applications` and sets up the `mvx` command in your PATH.
+
+### Manual install
+
+Download the latest release tarball, extract `mvx.app`, and move it to `~/Applications` (or `/Applications` if you have write access).
 
 If macOS blocks the app on first launch because it cannot verify the developer, open **System Settings > Privacy & Security**, review the security notice for `mvx`, and choose **Open Anyway**.
 
 If the app remains quarantined after installation, you can remove the quarantine attribute from Terminal:
 ```
-xattr -cr /Applications/mvx.app
+xattr -cr ~/Applications/mvx.app
 ```
 
-mvx ships with Sparkle-compatible update metadata for direct distribution builds.
+## Updates
+
+mvx checks for updates automatically on startup (once per 24 hours). When a new release is available, a notification appears and you can confirm the download and restart.
+
+You can also check manually from the menu bar: **mvx > Check for Updates** (`⌘⇧U`).
+
+Updates are delivered through GitHub Releases. A release becomes available only after a GitHub Release contains both the app tarball and a valid `latest.json` metadata file.
 
 ## Session restore
 

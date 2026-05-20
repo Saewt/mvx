@@ -1,0 +1,77 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and Publish Release
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Derive version and build
+        id: version
+        run: |
+          # Strip leading 'v' from tag to get the marketing version.
+          VERSION="${GITHUB_REF_NAME#v}"
+          BUILD="${GITHUB_RUN_NUMBER}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "build=$BUILD" >> "$GITHUB_OUTPUT"
+          echo "Tag $GITHUB_REF_NAME → version=$VERSION build=$BUILD"
+
+      - name: Regenerate Xcode project
+        run: |
+          brew install xcodegen
+          xcodegen generate
+
+      - name: Build release
+        env:
+          MVX_RELEASE_VERSION: ${{ steps.version.outputs.version }}
+          MVX_BUILD_NUMBER: ${{ steps.version.outputs.build }}
+          MVX_BUILD_DMG: "0"
+          MVX_ARCHIVE_DESTINATION: "platform=macOS,arch=arm64"
+          MVX_ARCHIVE_ARCHS: "arm64"
+        run: |
+          ./scripts/release-build
+
+      - name: Verify artifacts
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          BUILD="${{ steps.version.outputs.build }}"
+          TARBALL=".build/release/staging/mvx-${VERSION}-${BUILD}-darwin-aarch64.app.tar.gz"
+          LATEST_JSON=".build/release/staging/latest.json"
+          PUBLICATION_JSON=".build/release/staging/release-publication.json"
+
+          for f in "$TARBALL" "$LATEST_JSON" "$PUBLICATION_JSON"; do
+            if [ ! -f "$f" ]; then
+              echo "ERROR: Missing artifact: $f" >&2
+              exit 1
+            fi
+            echo "✓ $f"
+          done
+
+          # Verify latest.json contains matching version/build.
+          if ! grep -q "\"version\": \"$VERSION\"" "$LATEST_JSON"; then
+            echo "ERROR: latest.json version mismatch" >&2
+            exit 1
+          fi
+          if ! grep -q "\"build\": \"$BUILD\"" "$LATEST_JSON"; then
+            echo "ERROR: latest.json build mismatch" >&2
+            exit 1
+          fi
+          echo "✓ latest.json version/build match"
+
+      - name: Publish to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MVX_RELEASE_VERSION: ${{ steps.version.outputs.version }}
+          MVX_BUILD_NUMBER: ${{ steps.version.outputs.build }}
+        run: |
+          ./scripts/release-publish
