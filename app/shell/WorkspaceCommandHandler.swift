@@ -17,6 +17,10 @@ public enum WorkspaceCommand: String, Equatable, Hashable {
     case nextPane
     case previousPane
     case nextAttention
+    case closeDoneSessionsInActiveGroup
+    case closeAllSessionsInActiveGroup
+    case moveActiveGroupToUngrouped
+    case collapseOtherGroups
     case copy
     case paste
     case selectAll
@@ -50,6 +54,14 @@ public enum WorkspaceCommand: String, Equatable, Hashable {
             return "Previous Pane"
         case .nextAttention:
             return "Next Session Needing Attention"
+        case .closeDoneSessionsInActiveGroup:
+            return "Close Done Sessions in Active Group"
+        case .closeAllSessionsInActiveGroup:
+            return "Close All Sessions in Active Group"
+        case .moveActiveGroupToUngrouped:
+            return "Move Active Group Sessions to Ungrouped"
+        case .collapseOtherGroups:
+            return "Collapse Other Groups"
         case .copy:
             return "Copy"
         case .paste:
@@ -89,6 +101,14 @@ public enum WorkspaceCommand: String, Equatable, Hashable {
             return "rectangle.on.rectangle.angled.fill"
         case .nextAttention:
             return "bell"
+        case .closeDoneSessionsInActiveGroup:
+            return "checkmark.circle"
+        case .closeAllSessionsInActiveGroup:
+            return "xmark.circle"
+        case .moveActiveGroupToUngrouped:
+            return "tray.and.arrow.up"
+        case .collapseOtherGroups:
+            return "rectangle.compress.vertical"
         case .copy:
             return "doc.on.doc"
         case .paste:
@@ -124,6 +144,7 @@ public final class WorkspaceCommandHandler: ObservableObject {
     public let workspace: SessionWorkspace
     public let updateController: ReleaseUpdateController?
     @Published public var isCommandPalettePresented = false
+    @Published public var isUpdateSheetPresented = false
 
     public init(workspace: SessionWorkspace, updateController: ReleaseUpdateController? = nil) {
         self.workspace = workspace
@@ -135,6 +156,7 @@ public final class WorkspaceCommandHandler: ObservableObject {
         switch command {
         case .checkForUpdates:
             _ = updateController?.checkForUpdates()
+            isUpdateSheetPresented = true
             return nil
         case .commandPalette:
             isCommandPalettePresented = true
@@ -168,6 +190,18 @@ public final class WorkspaceCommandHandler: ObservableObject {
             return nil
         case .nextAttention:
             _ = workspace.selectNextAttentionSession()
+            return nil
+        case .closeDoneSessionsInActiveGroup:
+            _ = workspace.closeDoneSessions(inGroup: workspace.activeGroupID)
+            return nil
+        case .closeAllSessionsInActiveGroup:
+            _ = workspace.closeAllSessions(inGroup: workspace.activeGroupID)
+            return nil
+        case .moveActiveGroupToUngrouped:
+            _ = workspace.moveAllSessions(fromGroup: workspace.activeGroupID, toGroup: nil)
+            return nil
+        case .collapseOtherGroups:
+            _ = workspace.collapseOtherGroups(excluding: workspace.activeGroupID)
             return nil
         case .copy:
             guard let activeSession else {
@@ -206,6 +240,8 @@ public final class WorkspaceCommandHandler: ObservableObject {
             workspace.refreshVisibleState()
             return nil
         case .quit:
+            dismissUpdateSheet()
+            dismissCommandPalette()
             workspace.requestQuit()
             return nil
         }
@@ -213,6 +249,11 @@ public final class WorkspaceCommandHandler: ObservableObject {
 
     public func dismissCommandPalette() {
         isCommandPalettePresented = false
+    }
+
+    public func dismissUpdateSheet() {
+        isUpdateSheetPresented = false
+        updateController?.dismissUpdate()
     }
 
     public func chromeCommands() -> [WorkspaceCommandDescriptor] {
@@ -241,20 +282,31 @@ public final class WorkspaceCommandHandler: ObservableObject {
 
     public func availableCommands() -> [WorkspaceCommandDescriptor] {
         let activeGroupSessionCount = workspace.sessions(inGroup: workspace.activeGroupID).count
+        let activeGroupDoneSessionCount = workspace.sessions(inGroup: workspace.activeGroupID)
+            .filter { $0.agentStatus == .done }
+            .count
+        let canCollapseOtherGroups = workspace.sessionGroups.contains { group in
+            group.id != workspace.activeGroupID && !group.isCollapsed
+        }
 
         return [
+            WorkspaceCommandDescriptor(command: .checkForUpdates, title: WorkspaceCommand.checkForUpdates.title, keywords: ["update", "new version", "release"], isEnabled: updateController?.canCheckForUpdates ?? false),
             WorkspaceCommandDescriptor(command: .commandPalette, title: WorkspaceCommand.commandPalette.title, keywords: ["search", "actions"]),
             WorkspaceCommandDescriptor(command: .newWindow, title: WorkspaceCommand.newWindow.title, keywords: ["session", "create"]),
             WorkspaceCommandDescriptor(command: .newTab, title: WorkspaceCommand.newTab.title, keywords: ["session", "create"]),
             WorkspaceCommandDescriptor(command: .closeCurrentSession, title: WorkspaceCommand.closeCurrentSession.title, keywords: ["tab", "close"], isEnabled: workspace.activeSessionID != nil),
             WorkspaceCommandDescriptor(command: .closePane, title: WorkspaceCommand.closePane.title, keywords: ["split", "pane", "close"], isEnabled: workspace.workspaceGraph.paneCount > 1),
-            WorkspaceCommandDescriptor(command: .splitHorizontal, title: WorkspaceCommand.splitHorizontal.title, keywords: ["pane", "layout", "horizontal"], isEnabled: workspace.activeSessionID != nil),
-            WorkspaceCommandDescriptor(command: .splitVertical, title: WorkspaceCommand.splitVertical.title, keywords: ["pane", "layout", "vertical"], isEnabled: workspace.activeSessionID != nil),
+            WorkspaceCommandDescriptor(command: .splitHorizontal, title: WorkspaceCommand.splitHorizontal.title, keywords: ["pane", "layout", "horizontal"], isEnabled: workspace.workspaceGraph.rootPane != nil),
+            WorkspaceCommandDescriptor(command: .splitVertical, title: WorkspaceCommand.splitVertical.title, keywords: ["pane", "layout", "vertical"], isEnabled: workspace.workspaceGraph.rootPane != nil),
             WorkspaceCommandDescriptor(command: .nextSession, title: WorkspaceCommand.nextSession.title, keywords: ["cycle", "tab"], isEnabled: activeGroupSessionCount > 1),
             WorkspaceCommandDescriptor(command: .previousSession, title: WorkspaceCommand.previousSession.title, keywords: ["cycle", "tab"], isEnabled: activeGroupSessionCount > 1),
             WorkspaceCommandDescriptor(command: .nextPane, title: WorkspaceCommand.nextPane.title, keywords: ["cycle", "pane"], isEnabled: workspace.workspaceGraph.paneCount > 1),
             WorkspaceCommandDescriptor(command: .previousPane, title: WorkspaceCommand.previousPane.title, keywords: ["cycle", "pane"], isEnabled: workspace.workspaceGraph.paneCount > 1),
             WorkspaceCommandDescriptor(command: .nextAttention, title: WorkspaceCommand.nextAttention.title, keywords: ["waiting", "error", "badge"], isEnabled: workspace.nextAttentionSessionID() != nil),
+            WorkspaceCommandDescriptor(command: .closeDoneSessionsInActiveGroup, title: WorkspaceCommand.closeDoneSessionsInActiveGroup.title, keywords: ["bulk", "done", "close"], isEnabled: activeGroupDoneSessionCount > 0),
+            WorkspaceCommandDescriptor(command: .closeAllSessionsInActiveGroup, title: WorkspaceCommand.closeAllSessionsInActiveGroup.title, keywords: ["bulk", "close", "group"], isEnabled: activeGroupSessionCount > 0),
+            WorkspaceCommandDescriptor(command: .moveActiveGroupToUngrouped, title: WorkspaceCommand.moveActiveGroupToUngrouped.title, keywords: ["bulk", "move", "ungrouped"], isEnabled: workspace.activeGroupID != nil && activeGroupSessionCount > 0),
+            WorkspaceCommandDescriptor(command: .collapseOtherGroups, title: WorkspaceCommand.collapseOtherGroups.title, keywords: ["group", "collapse", "focus"], isEnabled: canCollapseOtherGroups),
             WorkspaceCommandDescriptor(command: .copy, title: WorkspaceCommand.copy.title, keywords: ["clipboard"], isEnabled: workspace.activeSessionID != nil),
             WorkspaceCommandDescriptor(command: .paste, title: WorkspaceCommand.paste.title, keywords: ["clipboard"], isEnabled: workspace.activeSessionID != nil),
             WorkspaceCommandDescriptor(command: .selectAll, title: WorkspaceCommand.selectAll.title, keywords: ["selection", "content"], isEnabled: workspace.activeSessionID != nil),

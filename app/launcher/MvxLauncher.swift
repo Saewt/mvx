@@ -1,13 +1,13 @@
+import AppKit
+import Darwin
 import SwiftUI
 import Mvx
 
 @main
 struct MvxLauncher: App {
-    @StateObject private var workspace: SessionWorkspace
-    @StateObject private var commandHandler: WorkspaceCommandHandler
+    @StateObject private var registry: WorkspaceRegistry
+    @StateObject private var proxy: ActiveWorkspaceProxy
     @StateObject private var updateController: ReleaseUpdateController
-    private let workspacePersistence: WorkspacePersistence
-    private let workspaceAutosaveController: WorkspaceAutosaveController
     private let terminalHostFactory: TerminalHostFactory
     private let blockedMessage: String?
     private let blockedDetails: [String]
@@ -15,82 +15,126 @@ struct MvxLauncher: App {
     init() {
         let resolvedPersistence = WorkspacePersistence()
         let resolvedUpdateController = ReleaseUpdateController()
+        let resolvedSessionFactory: (URL?) -> TerminalSession
+        let resolvedTerminalHostFactory: TerminalHostFactory
+        let resolvedBlockedMessage: String?
+        let resolvedBlockedDetails: [String]
 
         switch LauncherTerminalBootstrap.resolve() {
         case .ready(let sessionFactory, let terminalHostFactory):
-            let resolvedWorkspace = SessionWorkspace(
-                startsWithSession: false,
-                sessionFactoryWithStartupDirectory: sessionFactory
-            )
-
-            if let savedSnapshot = resolvedPersistence.load() {
-                let restored = resolvedWorkspace.restore(from: savedSnapshot)
-                if !restored {
-                    _ = resolvedWorkspace.createSession()
-                }
-            } else {
-                _ = resolvedWorkspace.createSession()
-            }
-
-            self.workspacePersistence = resolvedPersistence
-            self.workspaceAutosaveController = WorkspaceAutosaveController(
-                workspace: resolvedWorkspace,
-                persistence: resolvedPersistence
-            )
-            self.terminalHostFactory = terminalHostFactory
-            self.blockedMessage = nil
-            self.blockedDetails = []
-            _workspace = StateObject(wrappedValue: resolvedWorkspace)
-            _updateController = StateObject(wrappedValue: resolvedUpdateController)
-            _commandHandler = StateObject(
-                wrappedValue: WorkspaceCommandHandler(
-                    workspace: resolvedWorkspace,
-                    updateController: resolvedUpdateController
-                )
-            )
+            resolvedSessionFactory = sessionFactory
+            resolvedTerminalHostFactory = terminalHostFactory
+            resolvedBlockedMessage = nil
+            resolvedBlockedDetails = []
 
         case .blocked(let message, let details):
-            let resolvedWorkspace = SessionWorkspace(
-                startsWithSession: false,
-                sessionFactory: SessionWorkspace.unsupportedSessionFactory()
-            )
-
-            self.workspacePersistence = resolvedPersistence
-            self.workspaceAutosaveController = WorkspaceAutosaveController(
-                workspace: resolvedWorkspace,
-                persistence: resolvedPersistence
-            )
-            self.terminalHostFactory = .fallbackOnly
-            self.blockedMessage = message
-            self.blockedDetails = details
-            _workspace = StateObject(wrappedValue: resolvedWorkspace)
-            _updateController = StateObject(wrappedValue: resolvedUpdateController)
-            _commandHandler = StateObject(
-                wrappedValue: WorkspaceCommandHandler(
-                    workspace: resolvedWorkspace,
-                    updateController: resolvedUpdateController
-                )
-            )
+            resolvedSessionFactory = { _ in SessionWorkspace.unsupportedSessionFactory()() }
+            resolvedTerminalHostFactory = .fallbackOnly
+            resolvedBlockedMessage = message
+            resolvedBlockedDetails = details
         }
+
+        let resolvedRegistry = WorkspaceRegistry(
+            persistence: resolvedPersistence,
+            workspaceFactory: { _ in
+                SessionWorkspace(
+                    startsWithSession: true,
+                    sessionFactoryWithStartupDirectory: resolvedSessionFactory
+                )
+            }
+        )
+        Self.bootstrap(registry: resolvedRegistry, persistence: resolvedPersistence)
+
+        let resolvedProxy = ActiveWorkspaceProxy(updateController: resolvedUpdateController)
+        resolvedProxy.bind(to: resolvedRegistry)
+
+        self.terminalHostFactory = resolvedTerminalHostFactory
+        self.blockedMessage = resolvedBlockedMessage
+        self.blockedDetails = resolvedBlockedDetails
+        _registry = StateObject(wrappedValue: resolvedRegistry)
+        _proxy = StateObject(wrappedValue: resolvedProxy)
+        _updateController = StateObject(wrappedValue: resolvedUpdateController)
     }
 
     var body: some Scene {
         WindowGroup {
-            if let blockedMessage {
-                NativeRuntimeUnavailableView(message: blockedMessage, details: blockedDetails)
-            } else {
-                MvxWorkspaceScene(
-                    workspace: workspace,
-                    commandHandler: commandHandler,
-                    terminalHostFactory: terminalHostFactory
+            Group {
+                if let blockedMessage {
+                    NativeRuntimeUnavailableView(message: blockedMessage, details: blockedDetails)
+                } else {
+                    MvxWorkspaceScene(
+                        proxy: proxy,
+                        registry: registry,
+                        terminalHostFactory: terminalHostFactory
+                    )
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
+                try? registry.persistAll()
+            }
+            .task {
+                try? await Task.sleep(nanoseconds: 3 * 1_000_000_000)
+                updateController.scheduleAutoCheck {
+                    proxy.commandHandler?.isUpdateSheetPresented = true
+                }
+            }
+            .sheet(
+                isPresented: Binding(
+                    get: { proxy.commandHandler?.isUpdateSheetPresented ?? false },
+                    set: { isPresented in
+                        if isPresented {
+                            proxy.commandHandler?.isUpdateSheetPresented = true
+                        } else {
+                            proxy.commandHandler?.dismissUpdateSheet()
+                        }
+                    }
                 )
-                .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
-                    try? workspaceAutosaveController.persistNow()
+            ) {
+                if let commandHandler = proxy.commandHandler {
+                    UpdateView(
+                        controller: commandHandler.updateController ?? ReleaseUpdateController(),
+                        onClose: { commandHandler.isUpdateSheetPresented = false },
+                        onRestartRequested: {
+                            Self.performUpdateRestart(
+                                registry: registry,
+                                commandHandler: commandHandler
+                            )
+                        }
+                    )
                 }
             }
         }
         .commands {
-            WorkspaceCommands(commandHandler: commandHandler)
+            WorkspaceCommands(proxy: proxy)
+        }
+    }
+
+    private static func bootstrap(registry: WorkspaceRegistry, persistence: WorkspacePersistence) {
+        if let registrySnapshot = persistence.loadRegistry(),
+           registry.restore(from: registrySnapshot),
+           !registry.entries.isEmpty {
+            return
+        }
+
+        if let savedSnapshot = persistence.load() {
+            let entry = registry.createWorkspace(name: "Workspace 1")
+            _ = registry.workspace(for: entry.id)?.restore(from: savedSnapshot)
+            try? registry.persistAll()
+            return
+        }
+
+        _ = registry.createWorkspace(name: "Workspace 1")
+    }
+
+    private static func performUpdateRestart(
+        registry: WorkspaceRegistry,
+        commandHandler: WorkspaceCommandHandler
+    ) {
+        commandHandler.isUpdateSheetPresented = false
+        try? registry.persistAll()
+        NSApplication.shared.terminate(nil)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            Darwin.exit(0)
         }
     }
 }

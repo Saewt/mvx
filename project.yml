@@ -29,6 +29,8 @@ targets:
       - path: app/assets/Assets.xcassets
       - path: app/launcher/resources/agent-helpers
         type: folder
+      - path: app/launcher/resources/update-helpers
+        type: folder
       - path: vendor/ghostty/resources/ghostty
         type: folder
       - path: vendor/ghostty/resources/terminfo
@@ -48,12 +50,11 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         SWIFT_OBJC_BRIDGING_HEADER: app/launcher/native_terminal/MvxMac-Bridging-Header.h
         "OTHER_LDFLAGS[arch=*]": -lstdc++
-        MARKETING_VERSION: 0.1.3
-        CURRENT_PROJECT_VERSION: 3
+        MARKETING_VERSION: 0.1.4
+        CURRENT_PROJECT_VERSION: 4
         VERSIONING_SYSTEM: apple-generic
         ENABLE_HARDENED_RUNTIME: YES
-        INFOPLIST_KEY_MVXAppcastURL: https://downloads.example.com/mvx/appcast.xml
-        INFOPLIST_KEY_MVXDownloadBaseURL: https://downloads.example.com/mvx
+        INFOPLIST_KEY_MVXLatestReleaseURL: https://github.com/Saewt/mvx/releases/latest/download/latest.json
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
   MvxTests:
     type: bundle.unit-test

@@ -212,7 +212,10 @@ func makeTestSession(
 func makeTestWorkspace(
     autoStartSessions: Bool = true,
     startsWithSession: Bool = true,
-    sessionFactoryWithStartupDirectory: ((URL?) -> TerminalSession)? = nil
+    sessionFactoryWithStartupDirectory: ((URL?) -> TerminalSession)? = nil,
+    gitRootResolver: ((String) -> String?)? = nil,
+    gitChangeSummaryResolver: ((String) -> WorkspaceGitChangeSummary?)? = nil,
+    gitRefreshCacheTTL: TimeInterval = 5
 ) -> SessionWorkspace {
     let createWorkspace = {
         MainActor.assumeIsolated {
@@ -220,14 +223,20 @@ func makeTestWorkspace(
                 return SessionWorkspace(
                     autoStartSessions: autoStartSessions,
                     startsWithSession: startsWithSession,
-                    sessionFactoryWithStartupDirectory: sessionFactoryWithStartupDirectory
+                    sessionFactoryWithStartupDirectory: sessionFactoryWithStartupDirectory,
+                    gitRootResolver: gitRootResolver ?? WorkspaceMetadataSnapshot.gitRoot(for:),
+                    gitChangeSummaryResolver: gitChangeSummaryResolver ?? WorkspaceMetadataSnapshot.gitWorkingTreeDelta(workingDirectory:),
+                    gitRefreshCacheTTL: gitRefreshCacheTTL
                 )
             }
 
             return SessionWorkspace(
                 autoStartSessions: autoStartSessions,
                 startsWithSession: startsWithSession,
-                sessionFactory: { makeTestSession() }
+                sessionFactoryWithStartupDirectory: { _ in makeTestSession() },
+                gitRootResolver: gitRootResolver ?? WorkspaceMetadataSnapshot.gitRoot(for:),
+                gitChangeSummaryResolver: gitChangeSummaryResolver ?? WorkspaceMetadataSnapshot.gitWorkingTreeDelta(workingDirectory:),
+                gitRefreshCacheTTL: gitRefreshCacheTTL
             )
         }
     }
@@ -241,4 +250,24 @@ func makeTestWorkspace(
         workspace = createWorkspace()
     }
     return workspace!
+}
+
+func makeWritableTestBundle(version: String = "0.0.0", build: String = "0") -> Bundle {
+    let tempDir = FileManager.default.temporaryDirectory
+        .appendingPathComponent("test-bundle-\(UUID().uuidString)", isDirectory: true)
+    try! FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+
+    let plist: [String: Any] = [
+        "CFBundleIdentifier": "test.bundle",
+        "CFBundleShortVersionString": version,
+        "CFBundleVersion": build
+    ]
+    let plistData = try! PropertyListSerialization.data(
+        fromPropertyList: plist,
+        format: .binary,
+        options: 0
+    )
+    try! plistData.write(to: tempDir.appendingPathComponent("Info.plist"))
+
+    return Bundle(url: tempDir)!
 }

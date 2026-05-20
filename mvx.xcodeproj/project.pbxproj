@@ -27,6 +27,7 @@
 		3603CAB40F811DB59860CB5E /* WorkspaceAutosaveControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EE746688CB2AFFB9DD1F76D /* WorkspaceAutosaveControllerTests.swift */; };
 		373C7B2CA2B2A939DF0B1237 /* WorkspaceShellScaffold.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2878E56EF252F425A8507A33 /* WorkspaceShellScaffold.swift */; };
 		3A18F5CB4AE45EA2D94BFD0E /* WorkspaceShellLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8293C73F15D27A10AF973F70 /* WorkspaceShellLayoutTests.swift */; };
+		3BE8A2C3B9D54B4C1D0F05B5 /* CenterToolbarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D16AF53A265884F1A7A4E7D6 /* CenterToolbarView.swift */; };
 		3CD692FBBC152963B3A0DE60 /* SessionCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E13C8D72C94FD521EDC9AC0 /* SessionCommand.swift */; };
 		3E3900BAF5545AEC34787186 /* WorkspaceFileTreeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FF724567849DB4A43307031 /* WorkspaceFileTreeTests.swift */; };
 		3FEC04FB063D425529A512B8 /* Mvx.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = C589C5A2891CD58E9FD7D9B9 /* Mvx.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
@@ -36,6 +37,7 @@
 		41AAEA1D1515629BC5502F96 /* ClipboardBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB62DBEB1A8A2FC690520A1C /* ClipboardBridge.swift */; };
 		45F35EC88F4939F281372E9C /* TerminalLinkParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = B97DBE092DAC6EC444490488 /* TerminalLinkParser.swift */; };
 		46D592A7A7E1C1653BFC9BB7 /* WorkspaceModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D0B0D8603D0503210786DB8 /* WorkspaceModelTests.swift */; };
+		49EC62D3879F91117B6D7BCD /* ActiveWorkspaceProxy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E41DD2CC4F9902B03B92157 /* ActiveWorkspaceProxy.swift */; };
 		4A1834D73ACD5FCA671CE9D1 /* TerminalAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF5E49139B3C8C4EF75B8A76 /* TerminalAdapter.swift */; };
 		4EE16C2D40F54C7DE717BE91 /* GhosttySurfaceRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63E85E1DBC02A2A3237A2B33 /* GhosttySurfaceRuntime.swift */; };
 		50393FEA0D0D2383CC59D0A2 /* Mvx.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C589C5A2891CD58E9FD7D9B9 /* Mvx.framework */; };
@@ -51,10 +53,12 @@
 		6EC1C8A05230A4F744754831 /* WorkspacePanePersistenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 361CE7528E1D603C273024C9 /* WorkspacePanePersistenceTests.swift */; };
 		6EE44BCA95625F4AA785CB82 /* Carbon.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 53C294E3846E6575CEDCF2AE /* Carbon.framework */; };
 		714B71981E2F28E755E0AFFC /* SessionWorkspacePersistenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 283EAC52154BA44EF407A583 /* SessionWorkspacePersistenceTests.swift */; };
+		71FEB60F4E9CE92A30DB4363 /* AppUpdateHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF9A0B623B92F5803D358BE8 /* AppUpdateHelper.swift */; };
 		75ED46B054D2A430A8EE8A40 /* WorkspaceNotesCardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDCDFF0D2C519CC93D668F48 /* WorkspaceNotesCardTests.swift */; };
 		7F5056F7B61CA2E19A93B6CE /* SessionGroupHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93D7CB31B7AB94311E5AC31B /* SessionGroupHeaderView.swift */; };
 		809B992DA718BF568B723FA9 /* TerminalProbeRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 201191FA321D056C9EDC3765 /* TerminalProbeRunner.swift */; };
 		810E120F6C78A035B6833201 /* MvxLauncher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 236BEF60321496E23132387C /* MvxLauncher.swift */; };
+		891A3665C3420F45E052744D /* update-helpers in Resources */ = {isa = PBXBuildFile; fileRef = 3A6E7561F8E702D34C5984F9 /* update-helpers */; };
 		8920B37E8E62EDECE245D87F /* WorkspaceAutosaveController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17A70F395624411CD87DC5FF /* WorkspaceAutosaveController.swift */; };
 		8E6ED5CE472C1107E28D3932 /* TilingWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E918FC115E4AC9EFA74C6FF0 /* TilingWorkspaceView.swift */; };
 		90E8457D436A56E2DA990FD8 /* AppPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77C3E736F3E59E55D5EDCF5D /* AppPreferences.swift */; };
@@ -71,6 +75,7 @@
 		B27F60CEC5B5BB08C3E67C8A /* InMemoryTestTerminalDriver.swift in Sources */ = {isa = PBXBuildFile; fileRef = E58F9715B7AEC1AED8D01E21 /* InMemoryTestTerminalDriver.swift */; };
 		B81AFA0A17141B0F331F91A4 /* ghostty in Resources */ = {isa = PBXBuildFile; fileRef = 19961297C89A03F026C77242 /* ghostty */; };
 		BB3A6AA0E2047A0AB8D2113B /* WorkspaceCommandHandlerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E30F685A2BC2D34E6F75B6FE /* WorkspaceCommandHandlerTests.swift */; };
+		BC5A6998F73C171A65DBD44F /* LatestRelease.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D22340A3615C4B2A560B9FF /* LatestRelease.swift */; };
 		BF345203A3CFD887101C452C /* TerminalSessionDriver.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2DEE5F608D9D0FC6FC8EF48 /* TerminalSessionDriver.swift */; };
 		C08A1956D6D9858F97F3CC75 /* SessionWorkspaceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C481E45004FED98F5624B41 /* SessionWorkspaceTests.swift */; };
 		C369B96F1A9208A8B8E8E20D /* TerminalInteractionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F178B8CFD6399C8A2D65E979 /* TerminalInteractionTests.swift */; };
@@ -83,13 +88,16 @@
 		D190CE0128B7DAC83615E884 /* ReleasePackagingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F91C365080C3AA8ACA717524 /* ReleasePackagingTests.swift */; };
 		D2D8B3D590CFECEDECC5D666 /* TilingWorkspaceLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFAADA2F8669BF44B760E3FB /* TilingWorkspaceLayoutTests.swift */; };
 		D562AA2F4C2E2C766A56C6E4 /* ConfigStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F52862FBCF09D02A6532388 /* ConfigStore.swift */; };
+		DB38FC34D31DD2235FFD6F76 /* UpdateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9451846308863713A51A741B /* UpdateView.swift */; };
 		DF1F87E3571B0487D3B7EA54 /* PaneDividerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D0A6248B005A473CED163AB /* PaneDividerView.swift */; };
 		DF4DAE4A1DD9C087A328B62F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 20A344D1CC2BA2B16B313621 /* Assets.xcassets */; };
 		E0E8B45EEAF9FE7C0602A069 /* ThemePreset.swift in Sources */ = {isa = PBXBuildFile; fileRef = 374BBC61DAA69A43C7867632 /* ThemePreset.swift */; };
 		E8C98B4C06C3956B21C95B1E /* GhosttyKit.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 21DAD4974C8D68F8316D4011 /* GhosttyKit.xcframework */; };
 		EA5237A5A9AF708A16734D29 /* RenderBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0C5BEDCED6DA07D0020BEA0 /* RenderBridge.swift */; };
+		EBBAB7DEB35015CB571311BB /* ActiveWorkspaceProxyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D80C32AB0AB4B03F0A2B8819 /* ActiveWorkspaceProxyTests.swift */; };
 		EDBF75D834B12267344B5AA0 /* InputBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BA73E7F2C13D65C43CB0A44 /* InputBridge.swift */; };
 		EDD14191277F0E6106C2E122 /* WorkspaceSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5D96A7DBB03437C9769E766 /* WorkspaceSnapshot.swift */; };
+		EE008E4148532F414613A479 /* mvx-update-helper.sh in Resources */ = {isa = PBXBuildFile; fileRef = 1CDE3C6BC7643DF825AD55E4 /* mvx-update-helper.sh */; };
 		EE80C5A312187C9078DF80F5 /* DistributionChannelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9FE3BF3B4DE368FA61BE8DD /* DistributionChannelTests.swift */; };
 		FCB023D49A0635363A4C8DCC /* NativeGhosttySessionDriver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03830ABD1DD874362AD1D64F /* NativeGhosttySessionDriver.swift */; };
 		FDD90E035E5FD30364C9DCA7 /* SessionWorkspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = F520565A87DC0E9515CD449F /* SessionWorkspace.swift */; };
@@ -146,6 +154,9 @@
 		12D8E55435E392F0D061E35D /* GhosttySupportPaths.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhosttySupportPaths.swift; sourceTree = "<group>"; };
 		17A70F395624411CD87DC5FF /* WorkspaceAutosaveController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceAutosaveController.swift; sourceTree = "<group>"; };
 		19961297C89A03F026C77242 /* ghostty */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ghostty; path = vendor/ghostty/resources/ghostty; sourceTree = SOURCE_ROOT; };
+		1CDE3C6BC7643DF825AD55E4 /* mvx-update-helper.sh */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = "mvx-update-helper.sh"; sourceTree = "<group>"; };
+		1D22340A3615C4B2A560B9FF /* LatestRelease.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LatestRelease.swift; sourceTree = "<group>"; };
+		1E41DD2CC4F9902B03B92157 /* ActiveWorkspaceProxy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveWorkspaceProxy.swift; sourceTree = "<group>"; };
 		1EA048007D0D8EDA21FD6B60 /* SessionSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionSidebarView.swift; sourceTree = "<group>"; };
 		1FF724567849DB4A43307031 /* WorkspaceFileTreeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceFileTreeTests.swift; sourceTree = "<group>"; };
 		201191FA321D056C9EDC3765 /* TerminalProbeRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalProbeRunner.swift; sourceTree = "<group>"; };
@@ -164,6 +175,7 @@
 		361CE7528E1D603C273024C9 /* WorkspacePanePersistenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspacePanePersistenceTests.swift; sourceTree = "<group>"; };
 		36A77AA876E33611B06FBB19 /* MvxWorkspaceScene.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MvxWorkspaceScene.swift; sourceTree = "<group>"; };
 		374BBC61DAA69A43C7867632 /* ThemePreset.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemePreset.swift; sourceTree = "<group>"; };
+		3A6E7561F8E702D34C5984F9 /* update-helpers */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "update-helpers"; path = "app/launcher/resources/update-helpers"; sourceTree = SOURCE_ROOT; };
 		3BA73E7F2C13D65C43CB0A44 /* InputBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputBridge.swift; sourceTree = "<group>"; };
 		3C481E45004FED98F5624B41 /* SessionWorkspaceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionWorkspaceTests.swift; sourceTree = "<group>"; };
 		3E19F24CBC5E660D8A5A6E34 /* WorkspaceRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceRegistry.swift; sourceTree = "<group>"; };
@@ -187,6 +199,7 @@
 		8D0B0D8603D0503210786DB8 /* WorkspaceModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceModelTests.swift; sourceTree = "<group>"; };
 		90EB12DEDFC14229B7B12359 /* agent-helpers */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "agent-helpers"; path = "app/launcher/resources/agent-helpers"; sourceTree = SOURCE_ROOT; };
 		93D7CB31B7AB94311E5AC31B /* SessionGroupHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionGroupHeaderView.swift; sourceTree = "<group>"; };
+		9451846308863713A51A741B /* UpdateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateView.swift; sourceTree = "<group>"; };
 		9D713662FECB4E3A3C0CAEF4 /* WorkspaceNotesCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceNotesCardView.swift; sourceTree = "<group>"; };
 		A37A5B7F457B13C64C286E1F /* AppDirectories.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDirectories.swift; sourceTree = "<group>"; };
 		A62C5AC33864F711CF5213E4 /* mvx-wrap-agent */ = {isa = PBXFileReference; path = "mvx-wrap-agent"; sourceTree = "<group>"; };
@@ -207,10 +220,13 @@
 		C589C5A2891CD58E9FD7D9B9 /* Mvx.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Mvx.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		CB62DBEB1A8A2FC690520A1C /* ClipboardBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardBridge.swift; sourceTree = "<group>"; };
 		CDCDFF0D2C519CC93D668F48 /* WorkspaceNotesCardTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceNotesCardTests.swift; sourceTree = "<group>"; };
+		CF9A0B623B92F5803D358BE8 /* AppUpdateHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUpdateHelper.swift; sourceTree = "<group>"; };
 		D0E438D0EC390F0498CA7255 /* TerminalTextFidelityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalTextFidelityTests.swift; sourceTree = "<group>"; };
 		D0F6FA49D5C6601EB344156B /* NativeGhosttyTerminalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeGhosttyTerminalView.swift; sourceTree = "<group>"; };
+		D16AF53A265884F1A7A4E7D6 /* CenterToolbarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CenterToolbarView.swift; sourceTree = "<group>"; };
 		D55BDB18A2B53EF8AF70128E /* TerminalSessionSmokeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalSessionSmokeTests.swift; sourceTree = "<group>"; };
 		D5F5B1AC08644E11DAC8C625 /* ActiveWorkContextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveWorkContextView.swift; sourceTree = "<group>"; };
+		D80C32AB0AB4B03F0A2B8819 /* ActiveWorkspaceProxyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveWorkspaceProxyTests.swift; sourceTree = "<group>"; };
 		DAD3958FFCDE4A4964337476 /* CommandPaletteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandPaletteTests.swift; sourceTree = "<group>"; };
 		DC208708E09B04039BCD9CB1 /* SessionNaming.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionNaming.swift; sourceTree = "<group>"; };
 		DE82532191BB0DD63E911F6F /* SessionSidebarBehaviorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionSidebarBehaviorTests.swift; sourceTree = "<group>"; };
@@ -264,6 +280,7 @@
 			isa = PBXGroup;
 			children = (
 				D5F5B1AC08644E11DAC8C625 /* ActiveWorkContextView.swift */,
+				D16AF53A265884F1A7A4E7D6 /* CenterToolbarView.swift */,
 				2DFD04FE63DF560AD0ECAF87 /* CommandPaletteView.swift */,
 				8D0A6248B005A473CED163AB /* PaneDividerView.swift */,
 				93D7CB31B7AB94311E5AC31B /* SessionGroupHeaderView.swift */,
@@ -271,6 +288,7 @@
 				B51C44A340166C763E804750 /* SessionTabRowView.swift */,
 				30C2F2FEB4552DE021B34513 /* TerminalHostFactory.swift */,
 				E918FC115E4AC9EFA74C6FF0 /* TilingWorkspaceView.swift */,
+				9451846308863713A51A741B /* UpdateView.swift */,
 				0567E3FC1BEF570C79EFFFF1 /* WorkspaceFileTreeView.swift */,
 				9D713662FECB4E3A3C0CAEF4 /* WorkspaceNotesCardView.swift */,
 				2878E56EF252F425A8507A33 /* WorkspaceShellScaffold.swift */,
@@ -307,15 +325,25 @@
 				C3896F15537063F79E39153D /* terminal */,
 				533C2AC74D49D6A7D47BCE67 /* ui */,
 			);
-			path = app;
+			name = app;
+			path = ../../Desktop/codop/app;
 			sourceTree = "<group>";
 		};
 		78F2B317206ADBC85C6F72C8 /* resources */ = {
 			isa = PBXGroup;
 			children = (
 				61A034CA67D596437B074175 /* agent-helpers */,
+				80FE3C510B6BFFB9E5B0784C /* update-helpers */,
 			);
 			path = resources;
+			sourceTree = "<group>";
+		};
+		80FE3C510B6BFFB9E5B0784C /* update-helpers */ = {
+			isa = PBXGroup;
+			children = (
+				1CDE3C6BC7643DF825AD55E4 /* mvx-update-helper.sh */,
+			);
+			path = "update-helpers";
 			sourceTree = "<group>";
 		};
 		9034FD252157E9F5A48CBE8C /* Products */ = {
@@ -331,6 +359,7 @@
 		946E26EC1CA8B94DD110628D /* tests */ = {
 			isa = PBXGroup;
 			children = (
+				D80C32AB0AB4B03F0A2B8819 /* ActiveWorkspaceProxyTests.swift */,
 				734F9E620236616CF74CFB36 /* AppearanceConfigTests.swift */,
 				DAD3958FFCDE4A4964337476 /* CommandPaletteTests.swift */,
 				F9FE3BF3B4DE368FA61BE8DD /* DistributionChannelTests.swift */,
@@ -357,7 +386,8 @@
 				8293C73F15D27A10AF973F70 /* WorkspaceShellLayoutTests.swift */,
 				B3CB90B0CF2669F63A3A7828 /* Support */,
 			);
-			path = tests;
+			name = tests;
+			path = ../../Desktop/codop/tests;
 			sourceTree = "<group>";
 		};
 		948735E315A49E3F9991EF40 /* shell */ = {
@@ -374,6 +404,7 @@
 		964309A68C69FE0243407C1C /* session */ = {
 			isa = PBXGroup;
 			children = (
+				1E41DD2CC4F9902B03B92157 /* ActiveWorkspaceProxy.swift */,
 				22D0E89258CAD43D3F386B24 /* SessionAgentStatus.swift */,
 				5E13C8D72C94FD521EDC9AC0 /* SessionCommand.swift */,
 				33F74165411C8EA399E02408 /* SessionDescriptor.swift */,
@@ -399,7 +430,7 @@
 				78F2B317206ADBC85C6F72C8 /* resources */,
 			);
 			name = launcher;
-			path = app/launcher;
+			path = ../../Desktop/codop/app/launcher;
 			sourceTree = "<group>";
 		};
 		97EF77A89FD048B85E179C3B /* assets */ = {
@@ -408,12 +439,14 @@
 				20A344D1CC2BA2B16B313621 /* Assets.xcassets */,
 			);
 			name = assets;
-			path = app/assets;
+			path = ../../Desktop/codop/app/assets;
 			sourceTree = "<group>";
 		};
 		9F5A8420E3720B01B5829540 /* distribution */ = {
 			isa = PBXGroup;
 			children = (
+				CF9A0B623B92F5803D358BE8 /* AppUpdateHelper.swift */,
+				1D22340A3615C4B2A560B9FF /* LatestRelease.swift */,
 				725451D35481B73AD4EA111A /* ReleaseChannels.swift */,
 				10CBFF5A0A30E50DF0D936FC /* ReleasePackaging.swift */,
 			);
@@ -451,6 +484,7 @@
 				19961297C89A03F026C77242 /* ghostty */,
 				E20A610BE5814C138120B47E /* shell-integration */,
 				423EB637C483155CC8235E4C /* terminfo */,
+				3A6E7561F8E702D34C5984F9 /* update-helpers */,
 				785BF872C2C1166812B4AE29 /* app */,
 				97EF77A89FD048B85E179C3B /* assets */,
 				978C3E82786B163F2891795A /* launcher */,
@@ -584,8 +618,10 @@
 				DF4DAE4A1DD9C087A328B62F /* Assets.xcassets in Resources */,
 				12E87BD4F377BD61953A6CDF /* agent-helpers in Resources */,
 				B81AFA0A17141B0F331F91A4 /* ghostty in Resources */,
+				EE008E4148532F414613A479 /* mvx-update-helper.sh in Resources */,
 				085C25B8A6C7D60D9BFECA2A /* shell-integration in Resources */,
 				C98D04BE29C48541C33A29C0 /* terminfo in Resources */,
+				891A3665C3420F45E052744D /* update-helpers in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -596,6 +632,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				EBBAB7DEB35015CB571311BB /* ActiveWorkspaceProxyTests.swift in Sources */,
 				CB263D36506CD63CCA8C09ED /* AppearanceConfigTests.swift in Sources */,
 				FE5CA481D93434B45C4A32E7 /* CommandPaletteTests.swift in Sources */,
 				EE80C5A312187C9078DF80F5 /* DistributionChannelTests.swift in Sources */,
@@ -643,12 +680,16 @@
 			buildActionMask = 2147483647;
 			files = (
 				CFECBF1524C91F171C25805A /* ActiveWorkContextView.swift in Sources */,
+				49EC62D3879F91117B6D7BCD /* ActiveWorkspaceProxy.swift in Sources */,
 				17DCFA696F816C20C9E2D70A /* AppDirectories.swift in Sources */,
 				90E8457D436A56E2DA990FD8 /* AppPreferences.swift in Sources */,
+				71FEB60F4E9CE92A30DB4363 /* AppUpdateHelper.swift in Sources */,
+				3BE8A2C3B9D54B4C1D0F05B5 /* CenterToolbarView.swift in Sources */,
 				41AAEA1D1515629BC5502F96 /* ClipboardBridge.swift in Sources */,
 				9F34CAB96AE0D90037C415E6 /* CommandPaletteView.swift in Sources */,
 				D562AA2F4C2E2C766A56C6E4 /* ConfigStore.swift in Sources */,
 				EDBF75D834B12267344B5AA0 /* InputBridge.swift in Sources */,
+				BC5A6998F73C171A65DBD44F /* LatestRelease.swift in Sources */,
 				08A05434F1723EE105FF4478 /* MvxApp.swift in Sources */,
 				91333891763CE926DA173367 /* MvxWorkspaceScene.swift in Sources */,
 				DF1F87E3571B0487D3B7EA54 /* PaneDividerView.swift in Sources */,
@@ -675,6 +716,7 @@
 				BF345203A3CFD887101C452C /* TerminalSessionDriver.swift in Sources */,
 				E0E8B45EEAF9FE7C0602A069 /* ThemePreset.swift in Sources */,
 				8E6ED5CE472C1107E28D3932 /* TilingWorkspaceView.swift in Sources */,
+				DB38FC34D31DD2235FFD6F76 /* UpdateView.swift in Sources */,
 				8920B37E8E62EDECE245D87F /* WorkspaceAutosaveController.swift in Sources */,
 				920141DA5454F2A8C6F47B09 /* WorkspaceCommandHandler.swift in Sources */,
 				D12697DB94B341EBAAF894EB /* WorkspaceFileTreeView.swift in Sources */,
@@ -820,20 +862,19 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				ENABLE_HARDENED_RUNTIME = YES;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
 					"\"vendor/ghostty\"",
 				);
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_MVXAppcastURL = "https://downloads.example.com/mvx/appcast.xml";
-				INFOPLIST_KEY_MVXDownloadBaseURL = "https://downloads.example.com/mvx";
+				INFOPLIST_KEY_MVXLatestReleaseURL = "https://github.com/Saewt/mvx/releases/latest/download/latest.json";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.1.3;
+				MARKETING_VERSION = 0.1.4;
 				"OTHER_LDFLAGS[arch=*]" = "-lstdc++";
 				PRODUCT_BUNDLE_IDENTIFIER = dev.mvx.app;
 				PRODUCT_MODULE_NAME = MvxMac;
@@ -938,20 +979,19 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				ENABLE_HARDENED_RUNTIME = YES;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
 					"\"vendor/ghostty\"",
 				);
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_MVXAppcastURL = "https://downloads.example.com/mvx/appcast.xml";
-				INFOPLIST_KEY_MVXDownloadBaseURL = "https://downloads.example.com/mvx";
+				INFOPLIST_KEY_MVXLatestReleaseURL = "https://github.com/Saewt/mvx/releases/latest/download/latest.json";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.1.3;
+				MARKETING_VERSION = 0.1.4;
 				"OTHER_LDFLAGS[arch=*]" = "-lstdc++";
 				PRODUCT_BUNDLE_IDENTIFIER = dev.mvx.app;
 				PRODUCT_MODULE_NAME = MvxMac;

@@ -66,28 +66,13 @@ final class WorkflowChromeTests: XCTestCase {
 
         let chrome = SessionRailChromeState.resolve(workspace: workspace)
 
-        XCTAssertEqual(chrome.topActions.map(\.command), [.commandPalette, .nextAttention, .newTab])
+        XCTAssertEqual(chrome.topActions.map(\.command), [.newTab])
         XCTAssertEqual(
             chrome.topActions.map(\.tooltip),
             [
-                WorkspaceCommand.commandPalette.title,
-                WorkspaceCommand.nextAttention.title,
                 WorkspaceCommand.newTab.title,
             ]
         )
         XCTAssertTrue(chrome.topActions[0].isEnabled)
-        XCTAssertFalse(chrome.topActions[1].isEnabled)
-        XCTAssertTrue(chrome.topActions[2].isEnabled)
-    }
-
-    func testDisabledTopActionStillResolvesTooltipTitle() {
-        let workspace = makeTestWorkspace(autoStartSessions: false)
-
-        let chrome = SessionRailChromeState.resolve(workspace: workspace)
-        let action = try! XCTUnwrap(chrome.topActions.first(where: { !$0.isEnabled }))
-
-        XCTAssertEqual(action.command, .nextAttention)
-        XCTAssertEqual(action.tooltip, WorkspaceCommand.nextAttention.title)
-        XCTAssertFalse(action.tooltip.isEmpty)
     }
 }

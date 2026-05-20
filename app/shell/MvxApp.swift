@@ -1,13 +1,12 @@
 import AppKit
+import Darwin
 import SwiftUI
 
 @MainActor
 public struct MvxApp: App {
-    @StateObject private var workspace: SessionWorkspace
-    @StateObject private var commandHandler: WorkspaceCommandHandler
+    @StateObject private var registry: WorkspaceRegistry
+    @StateObject private var proxy: ActiveWorkspaceProxy
     @StateObject private var updateController: ReleaseUpdateController
-    private let workspacePersistence: WorkspacePersistence
-    private let workspaceAutosaveController: WorkspaceAutosaveController
     private let terminalHostFactory: TerminalHostFactory
 
     public init() {
@@ -32,50 +31,100 @@ public struct MvxApp: App {
         terminalHostFactory: TerminalHostFactory
     ) {
         let resolvedPersistence = WorkspacePersistence()
-        let resolvedWorkspace = SessionWorkspace(
-            startsWithSession: false,
-            sessionFactoryWithStartupDirectory: sessionFactoryWithStartupDirectory
-        )
-
-        if let savedSnapshot = resolvedPersistence.load() {
-            let restored = resolvedWorkspace.restore(from: savedSnapshot)
-            if !restored {
-                _ = resolvedWorkspace.createSession()
-            }
-        } else {
-            _ = resolvedWorkspace.createSession()
-        }
-
-        self.workspacePersistence = resolvedPersistence
-        self.workspaceAutosaveController = WorkspaceAutosaveController(
-            workspace: resolvedWorkspace,
-            persistence: resolvedPersistence
-        )
-        self.terminalHostFactory = terminalHostFactory
         let resolvedUpdateController = ReleaseUpdateController()
-        _workspace = StateObject(wrappedValue: resolvedWorkspace)
-        _updateController = StateObject(wrappedValue: resolvedUpdateController)
-        _commandHandler = StateObject(
-            wrappedValue: WorkspaceCommandHandler(
-                workspace: resolvedWorkspace,
-                updateController: resolvedUpdateController
-            )
+        let resolvedRegistry = WorkspaceRegistry(
+            persistence: resolvedPersistence,
+            workspaceFactory: { _ in
+                SessionWorkspace(
+                    startsWithSession: true,
+                    sessionFactoryWithStartupDirectory: sessionFactoryWithStartupDirectory
+                )
+            }
         )
+        Self.bootstrap(registry: resolvedRegistry, persistence: resolvedPersistence)
+
+        let resolvedProxy = ActiveWorkspaceProxy(updateController: resolvedUpdateController)
+        resolvedProxy.bind(to: resolvedRegistry)
+
+        self.terminalHostFactory = terminalHostFactory
+        _registry = StateObject(wrappedValue: resolvedRegistry)
+        _proxy = StateObject(wrappedValue: resolvedProxy)
+        _updateController = StateObject(wrappedValue: resolvedUpdateController)
     }
 
     public var body: some Scene {
         WindowGroup {
             MvxWorkspaceScene(
-                workspace: workspace,
-                commandHandler: commandHandler,
+                proxy: proxy,
+                registry: registry,
                 terminalHostFactory: terminalHostFactory
             )
             .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
-                try? workspaceAutosaveController.persistNow()
+                try? registry.persistAll()
+            }
+            .task {
+                try? await Task.sleep(nanoseconds: 3 * 1_000_000_000)
+                updateController.scheduleAutoCheck {
+                    proxy.commandHandler?.isUpdateSheetPresented = true
+                }
+            }
+            .sheet(
+                isPresented: Binding(
+                    get: { proxy.commandHandler?.isUpdateSheetPresented ?? false },
+                    set: { isPresented in
+                        if isPresented {
+                            proxy.commandHandler?.isUpdateSheetPresented = true
+                        } else {
+                            proxy.commandHandler?.dismissUpdateSheet()
+                        }
+                    }
+                )
+            ) {
+                if let commandHandler = proxy.commandHandler {
+                    UpdateView(
+                        controller: commandHandler.updateController ?? ReleaseUpdateController(),
+                        onClose: { commandHandler.isUpdateSheetPresented = false },
+                        onRestartRequested: {
+                            Self.performUpdateRestart(
+                                registry: registry,
+                                commandHandler: commandHandler
+                            )
+                        }
+                    )
+                }
             }
         }
         .commands {
-            WorkspaceCommands(commandHandler: commandHandler)
+            WorkspaceCommands(proxy: proxy)
+        }
+    }
+
+    private static func bootstrap(registry: WorkspaceRegistry, persistence: WorkspacePersistence) {
+        if let registrySnapshot = persistence.loadRegistry(),
+           registry.restore(from: registrySnapshot),
+           !registry.entries.isEmpty {
+            return
+        }
+
+        if let savedSnapshot = persistence.load() {
+            let entry = registry.createWorkspace(name: "Workspace 1")
+            _ = registry.workspace(for: entry.id)?.restore(from: savedSnapshot)
+            try? registry.persistAll()
+            return
+        }
+
+        _ = registry.createWorkspace(name: "Workspace 1")
+    }
+
+    private static func performUpdateRestart(
+        registry: WorkspaceRegistry,
+        commandHandler: WorkspaceCommandHandler
+    ) {
+        commandHandler.isUpdateSheetPresented = false
+        try? registry.persistAll()
+        NSApplication.shared.terminate(nil)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            Darwin.exit(0)
         }
     }
 }
@@ -126,97 +175,150 @@ public struct NativeRuntimeUnavailableView: View {
 }
 
 public struct WorkspaceCommands: Commands {
-    @ObservedObject public var commandHandler: WorkspaceCommandHandler
+    @ObservedObject public var proxy: ActiveWorkspaceProxy
 
-    public init(commandHandler: WorkspaceCommandHandler) {
-        self.commandHandler = commandHandler
+    public init(proxy: ActiveWorkspaceProxy) {
+        self.proxy = proxy
     }
 
     public var body: some Commands {
+        CommandGroup(after: .appInfo) {
+            Button("Check for Updates") {
+                perform(.checkForUpdates)
+            }
+            .keyboardShortcut("u", modifiers: [.command, .shift])
+            .disabled(commandHandler == nil)
+        }
+
         CommandMenu("Workspace") {
             Button("Command Palette") {
-                _ = commandHandler.perform(.commandPalette)
+                perform(.commandPalette)
             }
             .keyboardShortcut("p", modifiers: [.command, .shift])
+            .disabled(commandHandler == nil)
 
             Divider()
 
             Button("New Window") {
-                _ = commandHandler.perform(.newWindow)
+                perform(.newWindow)
             }
             .keyboardShortcut("n", modifiers: .command)
+            .disabled(commandHandler == nil)
 
             Button("New Tab") {
-                _ = commandHandler.perform(.newTab)
+                perform(.newTab)
             }
             .keyboardShortcut("t", modifiers: .command)
+            .disabled(commandHandler == nil)
 
             Divider()
 
             Button("Close Session") {
-                _ = commandHandler.perform(.closeCurrentSession)
+                perform(.closeCurrentSession)
             }
             .keyboardShortcut("w", modifiers: .command)
+            .disabled(commandHandler == nil)
 
             Button("Close Pane") {
-                _ = commandHandler.perform(.closePane)
+                perform(.closePane)
             }
             .keyboardShortcut("w", modifiers: [.command, .option])
+            .disabled(commandHandler == nil)
 
             Button("Split Vertical") {
-                _ = commandHandler.perform(.splitVertical)
+                perform(.splitVertical)
             }
             .keyboardShortcut("\\", modifiers: [.command, .shift])
+            .disabled(commandHandler == nil)
 
             Button("Split Horizontal") {
-                _ = commandHandler.perform(.splitHorizontal)
+                perform(.splitHorizontal)
             }
             .keyboardShortcut("-", modifiers: [.command, .shift])
+            .disabled(commandHandler == nil)
 
             Button("Next Pane") {
-                _ = commandHandler.perform(.nextPane)
+                perform(.nextPane)
             }
             .keyboardShortcut("]", modifiers: [.command, .option])
+            .disabled(commandHandler == nil)
 
             Button("Previous Pane") {
-                _ = commandHandler.perform(.previousPane)
+                perform(.previousPane)
             }
             .keyboardShortcut("[", modifiers: [.command, .option])
+            .disabled(commandHandler == nil)
 
             Button("Next Session") {
-                _ = commandHandler.perform(.nextSession)
+                perform(.nextSession)
             }
             .keyboardShortcut("`", modifiers: .command)
+            .disabled(commandHandler == nil)
 
             Button("Next Session Needing Attention") {
-                _ = commandHandler.perform(.nextAttention)
+                perform(.nextAttention)
             }
             .keyboardShortcut("n", modifiers: [.command, .shift])
+            .disabled(commandHandler == nil)
+
+            Divider()
+
+            Button("Close Done Sessions in Active Group") {
+                perform(.closeDoneSessionsInActiveGroup)
+            }
+            .disabled(commandHandler == nil)
+
+            Button("Close All Sessions in Active Group") {
+                perform(.closeAllSessionsInActiveGroup)
+            }
+            .disabled(commandHandler == nil)
+
+            Button("Move Active Group Sessions to Ungrouped") {
+                perform(.moveActiveGroupToUngrouped)
+            }
+            .disabled(commandHandler == nil)
+
+            Button("Collapse Other Groups") {
+                perform(.collapseOtherGroups)
+            }
+            .disabled(commandHandler == nil)
 
             Divider()
 
             Button("Copy") {
-                _ = commandHandler.perform(.copy)
+                perform(.copy)
             }
             .keyboardShortcut("c", modifiers: .command)
+            .disabled(commandHandler == nil)
 
             Button("Paste") {
-                _ = commandHandler.perform(.paste)
+                perform(.paste)
             }
             .keyboardShortcut("v", modifiers: .command)
+            .disabled(commandHandler == nil)
 
             Button("Select All") {
-                _ = commandHandler.perform(.selectAll)
+                perform(.selectAll)
             }
             .keyboardShortcut("a", modifiers: .command)
+            .disabled(commandHandler == nil)
 
             Divider()
 
             Button("Quit mvx") {
-                _ = commandHandler.perform(.quit)
+                perform(.quit)
                 NSApplication.shared.terminate(nil)
             }
             .keyboardShortcut("q", modifiers: .command)
+            .disabled(commandHandler == nil)
         }
+    }
+
+    private var commandHandler: WorkspaceCommandHandler? {
+        proxy.commandHandler
+    }
+
+    private func perform(_ command: WorkspaceCommand) {
+        _ = commandHandler?.perform(command)
     }
 }

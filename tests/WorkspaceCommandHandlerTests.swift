@@ -1,3 +1,4 @@
+import Combine
 import XCTest
 @testable import Mvx
 
@@ -147,5 +148,145 @@ final class WorkspaceCommandHandlerTests: XCTestCase {
         _ = handler.perform(.nextSession)
         XCTAssertEqual(workspace.activeSessionID, groupedA.id)
         XCTAssertNotEqual(workspace.activeSessionID, ungroupedID)
+    }
+
+    func testBulkGroupCommandsRouteThroughWorkspaceAndExposeAvailability() throws {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+        let handler = WorkspaceCommandHandler(workspace: workspace)
+        let firstID = try XCTUnwrap(workspace.activeSessionID)
+        let second = workspace.createSession(selectNewSession: false)
+        let outside = workspace.createSession(selectNewSession: false)
+        let activeGroup = workspace.createGroup(name: "Frontend", colorTag: nil)
+        let otherGroup = workspace.createGroup(name: "Backend", colorTag: nil)
+
+        XCTAssertTrue(workspace.assignSession(id: firstID, toGroup: activeGroup.id))
+        XCTAssertTrue(workspace.assignSession(id: second.id, toGroup: activeGroup.id))
+        XCTAssertTrue(workspace.assignSession(id: outside.id, toGroup: otherGroup.id))
+        XCTAssertTrue(workspace.selectGroup(id: activeGroup.id))
+        XCTAssertTrue(workspace.updateAgentStatus(id: firstID, status: .done))
+
+        let descriptors = Dictionary(uniqueKeysWithValues: handler.availableCommands().map { ($0.command, $0) })
+        XCTAssertTrue(try XCTUnwrap(descriptors[.closeDoneSessionsInActiveGroup]).isEnabled)
+        XCTAssertTrue(try XCTUnwrap(descriptors[.closeAllSessionsInActiveGroup]).isEnabled)
+        XCTAssertTrue(try XCTUnwrap(descriptors[.moveActiveGroupToUngrouped]).isEnabled)
+        XCTAssertTrue(try XCTUnwrap(descriptors[.collapseOtherGroups]).isEnabled)
+
+        _ = handler.perform(.closeDoneSessionsInActiveGroup)
+        XCTAssertNil(workspace.descriptor(for: firstID))
+        XCTAssertEqual(workspace.sessions(inGroup: activeGroup.id).map(\.id), [second.id])
+
+        _ = handler.perform(.closeAllSessionsInActiveGroup)
+        let replacement = try XCTUnwrap(workspace.sessions(inGroup: activeGroup.id).first)
+        XCTAssertNotEqual(replacement.id, second.id)
+
+        _ = handler.perform(.moveActiveGroupToUngrouped)
+        XCTAssertEqual(workspace.sessions(inGroup: activeGroup.id), [])
+        XCTAssertTrue(workspace.sessions(inGroup: nil).contains { $0.id == replacement.id })
+
+        _ = handler.perform(.collapseOtherGroups)
+        XCTAssertTrue(try XCTUnwrap(workspace.sessionGroups.first { $0.id == otherGroup.id }).isCollapsed)
+    }
+
+    func testSplitCommandsEnabledWhenPaneExists() throws {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+        let handler = WorkspaceCommandHandler(workspace: workspace)
+
+        let descriptors = Dictionary(uniqueKeysWithValues: handler.availableCommands().map { ($0.command, $0) })
+        XCTAssertTrue(try XCTUnwrap(descriptors[.splitHorizontal]).isEnabled)
+        XCTAssertTrue(try XCTUnwrap(descriptors[.splitVertical]).isEnabled)
+
+        _ = handler.perform(.splitVertical)
+        XCTAssertEqual(workspace.workspaceGraph.paneCount, 2)
+    }
+
+    func testSplitCommandsDisabledWhenNoPaneExists() throws {
+        let workspace = makeTestWorkspace(autoStartSessions: false, startsWithSession: false)
+        let handler = WorkspaceCommandHandler(workspace: workspace)
+
+        let descriptors = Dictionary(uniqueKeysWithValues: handler.availableCommands().map { ($0.command, $0) })
+        XCTAssertFalse(try XCTUnwrap(descriptors[.splitHorizontal]).isEnabled)
+        XCTAssertFalse(try XCTUnwrap(descriptors[.splitVertical]).isEnabled)
+    }
+
+    func testCheckForUpdatesPresentsUpdateSheet() {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+        let handler = WorkspaceCommandHandler(workspace: workspace, updateController: ReleaseUpdateController())
+
+        XCTAssertFalse(handler.isUpdateSheetPresented)
+
+        _ = handler.perform(.checkForUpdates)
+
+        XCTAssertTrue(handler.isUpdateSheetPresented)
+    }
+
+    func testAutoCheckOnlyOpensSheetWhenUpdateAvailable() {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+        let bundle = makeWritableTestBundle()
+        let controller = ReleaseUpdateController(bundle: bundle)
+        let handler = WorkspaceCommandHandler(workspace: workspace, updateController: controller)
+
+        XCTAssertFalse(handler.isUpdateSheetPresented)
+
+        // Simulate what MvxApp does: observe the controller state and present
+        // the sheet only when an update becomes available.
+        let expectation = XCTestExpectation(description: "sheet opened")
+        var cancellables: Set<AnyCancellable> = []
+        controller.$updateState
+            .dropFirst()
+            .filter { state in
+                if case .updateAvailable = state { return true }
+                return false
+            }
+            .sink { _ in
+                handler.isUpdateSheetPresented = true
+                expectation.fulfill()
+            }
+            .store(in: &cancellables)
+
+        // Simulate a background check that finds an update.
+        let release = LatestRelease(
+            version: "999.0.0",
+            build: "999",
+            minimumMacOS: "13.0",
+            platforms: .init(darwinAarch64: .init(
+                url: "https://example.com/mvx.tar.gz",
+                sha256: String(repeating: "a", count: 64)
+            ))
+        )
+        let publisher = Just(release)
+            .setFailureType(to: Error.self)
+            .eraseToAnyPublisher()
+
+        _ = controller.checkForUpdates(interactive: false, publisher: publisher)
+
+        wait(for: [expectation], timeout: 2.0)
+        XCTAssertTrue(handler.isUpdateSheetPresented)
+
+        cancellables.removeAll()
+    }
+
+    func testDismissUpdateSheetHidesUpdateSheet() {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+        let handler = WorkspaceCommandHandler(workspace: workspace, updateController: ReleaseUpdateController())
+
+        _ = handler.perform(.checkForUpdates)
+        XCTAssertTrue(handler.isUpdateSheetPresented)
+
+        handler.dismissUpdateSheet()
+
+        XCTAssertFalse(handler.isUpdateSheetPresented)
+    }
+
+    func testQuitHidesOpenUpdateSheetAndStillRequestsWorkspaceQuit() {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+        let handler = WorkspaceCommandHandler(workspace: workspace, updateController: ReleaseUpdateController())
+
+        _ = handler.perform(.checkForUpdates)
+        XCTAssertTrue(handler.isUpdateSheetPresented)
+
+        _ = handler.perform(.quit)
+
+        XCTAssertFalse(handler.isUpdateSheetPresented)
+        XCTAssertTrue(workspace.quitRequested)
     }
 }

@@ -78,18 +78,6 @@ public struct SessionRailChromeState: Equatable {
         SessionRailChromeState(
             topActions: [
                 TopAction(
-                    command: .commandPalette,
-                    symbolName: WorkspaceCommand.commandPalette.symbolName,
-                    tooltip: WorkspaceCommand.commandPalette.title,
-                    isEnabled: true
-                ),
-                TopAction(
-                    command: .nextAttention,
-                    symbolName: WorkspaceCommand.nextAttention.symbolName,
-                    tooltip: WorkspaceCommand.nextAttention.title,
-                    isEnabled: workspace.nextAttentionSessionID() != nil
-                ),
-                TopAction(
                     command: .newTab,
                     symbolName: WorkspaceCommand.newTab.symbolName,
                     tooltip: WorkspaceCommand.newTab.title,
