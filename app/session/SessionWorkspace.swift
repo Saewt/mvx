@@ -955,11 +955,19 @@ public final class SessionWorkspace: ObservableObject {
 
     @discardableResult
     func performAdaptiveSplit(_ axis: WorkspaceSplitAxis) -> Bool {
-        splitPane(targetPaneID: adaptiveSplitTargetPaneID(for: axis), axis: axis)
+        splitPane(
+            targetPaneID: adaptiveSplitTargetPaneID(for: axis),
+            axis: axis,
+            balanceAdaptiveLayout: true
+        )
     }
 
     @discardableResult
-    private func splitPane(targetPaneID: UUID?, axis: WorkspaceSplitAxis) -> Bool {
+    private func splitPane(
+        targetPaneID: UUID?,
+        axis: WorkspaceSplitAxis,
+        balanceAdaptiveLayout: Bool = false
+    ) -> Bool {
         let newSession = createSession(selectNewSession: false)
         let didSplit: Bool
         if let targetPaneID {
@@ -977,6 +985,10 @@ public final class SessionWorkspace: ObservableObject {
         guard didSplit else {
             _ = removeSessionWithoutReplacement(id: newSession.id)
             return false
+        }
+
+        if balanceAdaptiveLayout {
+            rebalanceAdaptiveLayoutIfNeeded()
         }
 
         synchronizeActiveSessionID(preferredSessionID: newSession.id, in: activeGroupID)
@@ -1018,6 +1030,7 @@ public final class SessionWorkspace: ObservableObject {
             guard let insertedPaneID = workspaceGraph.splitPane(
                 rootPane.id, axis: .horizontal, newSessionID: sessionID, insertion: .after
             ) else { return false }
+            rebalanceAdaptiveLayoutIfNeeded()
             _ = workspaceGraph.focusPane(insertedPaneID)
             return true
         }
@@ -1030,8 +1043,39 @@ public final class SessionWorkspace: ObservableObject {
         guard let insertedPaneID = workspaceGraph.splitPane(
             targetID, axis: .vertical, newSessionID: sessionID, insertion: .after
         ) else { return false }
+        rebalanceAdaptiveLayoutIfNeeded()
         _ = workspaceGraph.focusPane(insertedPaneID)
         return true
+    }
+
+    private func rebalanceAdaptiveLayoutIfNeeded() {
+        guard let rootPane = workspaceGraph.rootPane,
+              rootPane.axis == .horizontal,
+              rootPane.children.count == 2 else {
+            return
+        }
+
+        let topNode = rootPane.children[0]
+        let bottomNode = rootPane.children[1]
+
+        if topNode.axis == .vertical,
+           topNode.children.count == 2,
+           topNode.children.allSatisfy(\.isLeaf),
+           bottomNode.isLeaf,
+           workspaceGraph.paneCount == 3 {
+            _ = workspaceGraph.resizeSplit(branchPaneID: rootPane.id, ratio: 2.0 / 3.0)
+            return
+        }
+
+        if topNode.axis == .vertical,
+           topNode.children.count == 2,
+           topNode.children.allSatisfy(\.isLeaf),
+           bottomNode.axis == .vertical,
+           bottomNode.children.count == 2,
+           bottomNode.children.allSatisfy(\.isLeaf),
+           workspaceGraph.paneCount == 4 {
+            _ = workspaceGraph.resizeSplit(branchPaneID: rootPane.id, ratio: 0.5)
+        }
     }
 
     @discardableResult

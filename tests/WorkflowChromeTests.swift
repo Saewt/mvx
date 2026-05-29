@@ -17,7 +17,7 @@ final class WorkflowChromeTests: XCTestCase {
 
         let state = ActiveWorkContextState.resolve(workspace: workspace, commandHandler: handler)
 
-        XCTAssertEqual(state.title, "mvx")
+        XCTAssertEqual(state.title, "claude")
         XCTAssertEqual(state.statusLabel, "Waiting for Input")
         XCTAssertEqual(state.statusAccentName, "orange")
         XCTAssertTrue(state.contextLine.contains("mvx"))
@@ -37,7 +37,7 @@ final class WorkflowChromeTests: XCTestCase {
 
         XCTAssertEqual(
             state.paneActions.map(\.command),
-            [.splitVertical, .splitHorizontal, .nextPane, .closePane]
+            [.splitVertical, .splitHorizontal, .zoomPane, .nextPane, .closePane]
         )
         XCTAssertEqual(state.paneActions[0].symbolName, "rectangle.split.2x1")
         XCTAssertEqual(state.paneActions[1].symbolName, "rectangle.split.1x2")
@@ -51,7 +51,7 @@ final class WorkflowChromeTests: XCTestCase {
 
         let commands = handler.chromeCommands()
 
-        XCTAssertEqual(commands.map(\.command), [.commandPalette, .newTab, .nextAttention, .closeCurrentSession])
+        XCTAssertEqual(commands.map(\.command), [.commandPalette, .newTab, .nextAttention, .zoomPane, .toggleFocusMode, .closeCurrentSession])
         XCTAssertEqual(commands.first?.isEnabled, true)
 
         _ = handler.perform(.newTab)

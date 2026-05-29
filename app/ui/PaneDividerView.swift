@@ -5,6 +5,7 @@ public struct PaneDividerView: View {
     public let axis: WorkspaceSplitAxis
     public let isActiveFocusLine: Bool
     public let onDrag: (CGFloat) -> Void
+    private let thickness: CGFloat
 
     @State private var isHovered = false
     @State private var isDragging = false
@@ -12,24 +13,35 @@ public struct PaneDividerView: View {
     public init(
         axis: WorkspaceSplitAxis,
         isActiveFocusLine: Bool = false,
+        thickness: CGFloat = 4,
         onDrag: @escaping (CGFloat) -> Void
     ) {
         self.axis = axis
         self.isActiveFocusLine = isActiveFocusLine
+        self.thickness = thickness
         self.onDrag = onDrag
     }
 
     public var body: some View {
         let isVerticalSeam = axis == .vertical
+        let barThickness: CGFloat = 2
 
         Rectangle()
-            .fill(dividerColor)
+            .fill(Color.clear)
             .frame(
-                width: isVerticalSeam ? 6 : nil,
-                height: isVerticalSeam ? nil : 6
+                width: isVerticalSeam ? thickness : nil,
+                height: isVerticalSeam ? nil : thickness
             )
+            .overlay(alignment: .center) {
+                Rectangle()
+                    .fill(dividerColor)
+                    .frame(
+                        width: isVerticalSeam ? barThickness : nil,
+                        height: isVerticalSeam ? nil : barThickness
+                    )
+                    .shadow(color: dividerGlowColor, radius: isDragging ? 8 : (isActiveFocusLine ? 5 : 0))
+            }
             .contentShape(Rectangle())
-            .shadow(color: dividerGlowColor, radius: isDragging ? 8 : (isActiveFocusLine ? 5 : 0))
             .onHover { hovering in
                 isHovered = hovering
                 if hovering {
@@ -48,10 +60,10 @@ public struct PaneDividerView: View {
                             : value.translation.height
                         onDrag(delta)
                     }
-                      .onEnded { _ in
-                          isDragging = false
-                      }
-              )
+                    .onEnded { _ in
+                        isDragging = false
+                    }
+            )
             .animation(.easeInOut(duration: 0.14), value: isHovered)
             .animation(.easeInOut(duration: 0.12), value: isDragging)
             .animation(.easeInOut(duration: 0.22), value: isActiveFocusLine)

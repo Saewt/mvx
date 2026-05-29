@@ -228,6 +228,7 @@ final class SessionWorkspaceTests: XCTestCase {
         XCTAssertEqual(workspace.workspaceGraph.paneCount, 3)
         XCTAssertEqual(rootPane.axis, .horizontal)
         XCTAssertEqual(rootPane.children.count, 2)
+        XCTAssertEqual(rootPane.splitRatio, CGFloat(2.0 / 3.0), accuracy: 0.0001)
         XCTAssertEqual(rootPane.children[0].axis, .vertical)
         XCTAssertEqual(rootPane.children[0].children.count, 2)
         XCTAssertTrue(rootPane.children[0].children.allSatisfy(\.isLeaf))
@@ -258,17 +259,21 @@ final class SessionWorkspaceTests: XCTestCase {
 
         XCTAssertTrue(workspace.perform(.splitHorizontal))
         XCTAssertTrue(workspace.perform(.splitVertical))
+        var rootPane = try XCTUnwrap(workspace.workspaceGraph.rootPane)
+        XCTAssertEqual(rootPane.splitRatio, CGFloat(2.0 / 3.0), accuracy: 0.0001)
+
         XCTAssertTrue(workspace.perform(.splitVertical))
         let focusedPaneID = try XCTUnwrap(workspace.focusedPaneID)
 
         XCTAssertTrue(workspace.perform(.splitVertical))
 
-        let rootPane = try XCTUnwrap(workspace.workspaceGraph.rootPane)
+        rootPane = try XCTUnwrap(workspace.workspaceGraph.rootPane)
         let bottomBranch = rootPane.children[1]
         let nestedBranch = bottomBranch.children[1]
 
         XCTAssertEqual(workspace.workspaceGraph.paneCount, 5)
         XCTAssertEqual(rootPane.axis, .horizontal)
+        XCTAssertEqual(rootPane.splitRatio, 0.5, accuracy: 0.0001)
         XCTAssertEqual(rootPane.children.count, 2)
         XCTAssertEqual(rootPane.children[0].axis, .vertical)
         XCTAssertEqual(bottomBranch.axis, .vertical)
@@ -476,6 +481,7 @@ final class SessionWorkspaceTests: XCTestCase {
         let root = try XCTUnwrap(workspace.workspaceGraph.rootPane)
         XCTAssertEqual(root.axis, .horizontal)
         XCTAssertEqual(root.children[0].axis, .vertical)
+        XCTAssertEqual(root.splitRatio, CGFloat(2.0 / 3.0), accuracy: 0.0001)
         XCTAssertTrue(root.children[1].isLeaf)
     }
 
@@ -502,6 +508,7 @@ final class SessionWorkspaceTests: XCTestCase {
         XCTAssertEqual(workspace.workspaceGraph.paneCount, 4)
         let root = try XCTUnwrap(workspace.workspaceGraph.rootPane)
         XCTAssertEqual(root.axis, .horizontal)
+        XCTAssertEqual(root.splitRatio, 0.5, accuracy: 0.0001)
         XCTAssertEqual(root.children[0].axis, .vertical)
         XCTAssertEqual(root.children[1].axis, .vertical)
     }

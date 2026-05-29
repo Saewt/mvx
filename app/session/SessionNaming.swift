@@ -8,7 +8,11 @@ public enum SessionNaming {
         fallbackOrdinal: Int
     ) -> String {
         if let terminal = normalizedValue(terminalTitle) {
-            return terminal
+            return displayTitle(fromTerminalTitle: terminal)
+        }
+
+        if let process = meaningfulProcessTitle(foregroundProcessName) {
+            return process
         }
 
         if let directory = normalizedValue(workingDirectoryPath) {
@@ -24,9 +28,8 @@ public enum SessionNaming {
             return directory
         }
 
-        if let process = normalizedValue(foregroundProcessName) {
-            let component = URL(fileURLWithPath: process).lastPathComponent
-            return component.isEmpty ? process : component
+        if let process = processTitle(foregroundProcessName) {
+            return process
         }
 
         return "Session \(max(fallbackOrdinal, 1))"
@@ -43,4 +46,45 @@ public enum SessionNaming {
 
         return trimmed
     }
+
+    private static func meaningfulProcessTitle(_ processName: String?) -> String? {
+        guard let process = processTitle(processName),
+              !shellProcessNames.contains(process.lowercased()) else {
+            return nil
+        }
+
+        return process
+    }
+
+    private static func processTitle(_ processName: String?) -> String? {
+        guard let process = normalizedValue(processName) else {
+            return nil
+        }
+
+        let component = URL(fileURLWithPath: process).lastPathComponent
+        return component.isEmpty ? process : component
+    }
+
+    private static func displayTitle(fromTerminalTitle title: String) -> String {
+        guard title.contains("/") else {
+            return title
+        }
+
+        let normalized = title.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        guard !normalized.isEmpty else {
+            return title
+        }
+
+        let component = normalized.split(separator: "/").last.map(String.init)
+        return component?.isEmpty == false ? component! : title
+    }
+
+    private static let shellProcessNames: Set<String> = [
+        "bash",
+        "fish",
+        "login",
+        "sh",
+        "tcsh",
+        "zsh",
+    ]
 }

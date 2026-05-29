@@ -21,6 +21,9 @@ public enum WorkspaceCommand: String, Equatable, Hashable {
     case closeAllSessionsInActiveGroup
     case moveActiveGroupToUngrouped
     case collapseOtherGroups
+    case zoomPane
+    case exitZoom
+    case toggleFocusMode
     case copy
     case paste
     case selectAll
@@ -62,6 +65,12 @@ public enum WorkspaceCommand: String, Equatable, Hashable {
             return "Move Active Group Sessions to Ungrouped"
         case .collapseOtherGroups:
             return "Collapse Other Groups"
+        case .zoomPane:
+            return "Zoom Pane"
+        case .exitZoom:
+            return "Exit Zoom"
+        case .toggleFocusMode:
+            return "Toggle Focus Mode"
         case .copy:
             return "Copy"
         case .paste:
@@ -109,6 +118,12 @@ public enum WorkspaceCommand: String, Equatable, Hashable {
             return "tray.and.arrow.up"
         case .collapseOtherGroups:
             return "rectangle.compress.vertical"
+        case .zoomPane:
+            return "arrow.up.left.and.arrow.down.right"
+        case .exitZoom:
+            return "arrow.down.right.and.arrow.up.left"
+        case .toggleFocusMode:
+            return "eye.slash"
         case .copy:
             return "doc.on.doc"
         case .paste:
@@ -145,6 +160,12 @@ public final class WorkspaceCommandHandler: ObservableObject {
     public let updateController: ReleaseUpdateController?
     @Published public var isCommandPalettePresented = false
     @Published public var isUpdateSheetPresented = false
+    @Published public var zoomedPaneID: UUID?
+    @Published public var isFocusModeActive = false
+
+    public var isPaneZoomed: Bool {
+        zoomedPaneID != nil
+    }
 
     public init(workspace: SessionWorkspace, updateController: ReleaseUpdateController? = nil) {
         self.workspace = workspace
@@ -165,31 +186,62 @@ public final class WorkspaceCommandHandler: ObservableObject {
             _ = workspace.createSession()
             return nil
         case .closeCurrentSession:
+            exitZoom()
             _ = workspace.closeCurrentSession()
             return nil
         case .closePane:
+            exitZoom()
             _ = workspace.closeFocusedPane()
             return nil
         case .splitHorizontal:
+            exitZoom()
             _ = workspace.performAdaptiveSplit(.horizontal)
             return nil
         case .splitVertical:
+            exitZoom()
             _ = workspace.performAdaptiveSplit(.vertical)
             return nil
         case .nextSession:
+            exitZoom()
             _ = workspace.selectNextSession()
             return nil
         case .previousSession:
+            exitZoom()
             _ = workspace.selectPreviousSession()
             return nil
         case .nextPane:
+            exitZoom()
             _ = workspace.focusNextPane()
             return nil
         case .previousPane:
+            exitZoom()
             _ = workspace.focusPreviousPane()
             return nil
         case .nextAttention:
+            exitZoom()
             _ = workspace.selectNextAttentionSession()
+            return nil
+        case .zoomPane:
+            guard workspace.workspaceGraph.paneCount > 1 || zoomedPaneID != nil else {
+                return nil
+            }
+
+            guard let focusedPaneID = workspace.focusedPaneID else {
+                exitZoom()
+                return nil
+            }
+
+            if zoomedPaneID == focusedPaneID {
+                exitZoom()
+            } else {
+                zoomedPaneID = focusedPaneID
+            }
+            return nil
+        case .exitZoom:
+            exitZoom()
+            return nil
+        case .toggleFocusMode:
+            isFocusModeActive.toggle()
             return nil
         case .closeDoneSessionsInActiveGroup:
             _ = workspace.closeDoneSessions(inGroup: workspace.activeGroupID)
@@ -256,11 +308,21 @@ public final class WorkspaceCommandHandler: ObservableObject {
         updateController?.dismissUpdate()
     }
 
+    public func exitZoom() {
+        guard zoomedPaneID != nil else {
+            return
+        }
+
+        zoomedPaneID = nil
+    }
+
     public func chromeCommands() -> [WorkspaceCommandDescriptor] {
         let preferredOrder: [WorkspaceCommand] = [
             .commandPalette,
             .newTab,
             .nextAttention,
+            .zoomPane,
+            .toggleFocusMode,
             .closeCurrentSession
         ]
 
@@ -272,6 +334,7 @@ public final class WorkspaceCommandHandler: ObservableObject {
         let preferredOrder: [WorkspaceCommand] = [
             .splitVertical,
             .splitHorizontal,
+            .zoomPane,
             .nextPane,
             .closePane
         ]
@@ -307,6 +370,9 @@ public final class WorkspaceCommandHandler: ObservableObject {
             WorkspaceCommandDescriptor(command: .closeAllSessionsInActiveGroup, title: WorkspaceCommand.closeAllSessionsInActiveGroup.title, keywords: ["bulk", "close", "group"], isEnabled: activeGroupSessionCount > 0),
             WorkspaceCommandDescriptor(command: .moveActiveGroupToUngrouped, title: WorkspaceCommand.moveActiveGroupToUngrouped.title, keywords: ["bulk", "move", "ungrouped"], isEnabled: workspace.activeGroupID != nil && activeGroupSessionCount > 0),
             WorkspaceCommandDescriptor(command: .collapseOtherGroups, title: WorkspaceCommand.collapseOtherGroups.title, keywords: ["group", "collapse", "focus"], isEnabled: canCollapseOtherGroups),
+            WorkspaceCommandDescriptor(command: .zoomPane, title: WorkspaceCommand.zoomPane.title, keywords: ["zoom", "focus", "pane"], isEnabled: workspace.workspaceGraph.paneCount > 1 || zoomedPaneID != nil),
+            WorkspaceCommandDescriptor(command: .exitZoom, title: WorkspaceCommand.exitZoom.title, keywords: ["zoom", "exit", "unzoom"], isEnabled: zoomedPaneID != nil),
+            WorkspaceCommandDescriptor(command: .toggleFocusMode, title: WorkspaceCommand.toggleFocusMode.title, keywords: ["focus", "fullscreen", "distraction"]),
             WorkspaceCommandDescriptor(command: .copy, title: WorkspaceCommand.copy.title, keywords: ["clipboard"], isEnabled: workspace.activeSessionID != nil),
             WorkspaceCommandDescriptor(command: .paste, title: WorkspaceCommand.paste.title, keywords: ["clipboard"], isEnabled: workspace.activeSessionID != nil),
             WorkspaceCommandDescriptor(command: .selectAll, title: WorkspaceCommand.selectAll.title, keywords: ["selection", "content"], isEnabled: workspace.activeSessionID != nil),

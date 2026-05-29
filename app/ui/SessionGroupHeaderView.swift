@@ -33,24 +33,18 @@ public struct SessionGroupHeaderView: View {
             .count
         let collapseActionLabel = Self.collapseActionLabel(isCollapsed: group.isCollapsed)
 
-        return HStack(spacing: 8) {
+        return HStack(spacing: MvxLayout.indicatorGap) {
             Button {
                 _ = workspace.setGroupCollapsed(id: group.id, isCollapsed: !group.isCollapsed)
             } label: {
                 Image(systemName: group.isCollapsed ? "chevron.right" : "chevron.down")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 14, height: 14)
+                    .font(.system(size: MvxIcon.glyph, weight: .semibold))
+                    .foregroundStyle(isActive ? Color.accentColor : Color.secondary)
+                    .frame(width: MvxLayout.indicatorLane, height: MvxLayout.indicatorLane)
             }
             .buttonStyle(.plain)
             .help(collapseActionLabel)
             .accessibilityLabel(Text(collapseActionLabel))
-
-            if let colorTag = group.colorTag {
-                Circle()
-                    .fill(color(for: colorTag))
-                    .frame(width: 8, height: 8)
-            }
 
             if renameController.isRenaming {
                 SessionInlineRenameField(
@@ -65,39 +59,41 @@ public struct SessionGroupHeaderView: View {
                 )
             } else {
                 Text(group.name)
-                    .font(.system(.body, design: .monospaced))
+                    .font(MvxText.rowTitle)
                     .lineLimit(1)
+            }
+
+            if let colorTag = group.colorTag {
+                Circle()
+                    .fill(MvxStatusStyle.color(for: colorTag))
+                    .frame(width: MvxIcon.statusDot, height: MvxIcon.statusDot)
             }
 
             Spacer(minLength: 0)
 
             if group.isCollapsed, aggregateStatus != .none {
                 Circle()
-                    .fill(color(for: aggregateStatus))
-                    .frame(width: 9, height: 9)
+                    .fill(MvxStatusStyle.color(for: aggregateStatus))
+                    .frame(width: MvxIcon.statusDot, height: MvxIcon.statusDot)
                     .help(aggregateStatus.badgeLabel ?? "")
                     .accessibilityLabel(Text(aggregateStatus.badgeLabel ?? ""))
             }
 
             Text("\(sessionCount)")
-                .font(.system(.caption2, design: .rounded))
+                .font(MvxText.meta)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 3)
                 .background(
                     Capsule(style: .continuous)
-                        .fill(Color.white.opacity(0.05))
+                        .fill(MvxSurface.cardTint)
                 )
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
+        .padding(.horizontal, MvxSpacing.md)
+        .padding(.vertical, 6)
         .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(isActive ? Color.accentColor.opacity(0.14) : Color.white.opacity(0.03))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(isActive ? Color.accentColor.opacity(0.7) : Color.clear, lineWidth: 1)
+            RoundedRectangle(cornerRadius: MvxRadius.control, style: .continuous)
+                .fill(isActive ? MvxSurface.selectionTint : Color.clear)
         )
         .contentShape(Rectangle())
         .onTapGesture {
@@ -203,37 +199,5 @@ public struct SessionGroupHeaderView: View {
 
     private func cancelRename() {
         renameController.cancel()
-    }
-
-    private func color(for groupColor: SessionGroupColor) -> Color {
-        switch groupColor {
-        case .blue:
-            return .blue
-        case .green:
-            return .green
-        case .orange:
-            return .orange
-        case .red:
-            return .red
-        case .purple:
-            return .purple
-        case .teal:
-            return .teal
-        }
-    }
-
-    private func color(for status: SessionAgentStatus) -> Color {
-        switch status.badgeColorName {
-        case "green":
-            return .green
-        case "orange":
-            return .orange
-        case "blue":
-            return .blue
-        case "red":
-            return .red
-        default:
-            return .clear
-        }
     }
 }

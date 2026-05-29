@@ -34,6 +34,21 @@ public enum SessionAgentStatus: String, Codable, CaseIterable {
         }
     }
 
+    public var attentionLabel: String? {
+        guard needsAttention else {
+            return nil
+        }
+
+        switch self {
+        case .waiting:
+            return "Waiting"
+        case .error:
+            return "Error"
+        default:
+            return nil
+        }
+    }
+
     public var badgeColorName: String? {
         guard showsBadge else {
             return nil
@@ -47,7 +62,7 @@ public enum SessionAgentStatus: String, Codable, CaseIterable {
         case .waiting:
             return "orange"
         case .done:
-            return "blue"
+            return "teal"
         case .error:
             return "red"
         }

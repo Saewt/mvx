@@ -300,7 +300,7 @@ final class WorkspaceFileTreeController: ObservableObject {
     @Published private(set) var rootNodes: [WorkspaceFileTreeNode]
     @Published private(set) var isLoading = false
     @Published private(set) var rootEmptyState: WorkspaceFileTreeEmptyState = .empty
-    @Published var isSectionExpanded = true
+    @Published var isSectionExpanded = false
 
     private var workspace: SessionWorkspace
     private let reader: WorkspaceFileTreeReader
@@ -571,18 +571,49 @@ struct WorkspaceFileTreeSectionView: View {
     let workspace: SessionWorkspace
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            header
+        VStack(alignment: .leading, spacing: MvxSpacing.sm) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.16)) {
+                    controller.isSectionExpanded.toggle()
+                }
+            } label: {
+                HStack(spacing: MvxLayout.indicatorGap) {
+                    Image(systemName: controller.isSectionExpanded ? "chevron.down" : "chevron.right")
+                        .font(.system(size: MvxIcon.glyph, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: MvxLayout.indicatorLane, height: MvxLayout.indicatorLane)
+
+                    Text("Files")
+                        .textCase(.uppercase)
+                        .tracking(1.2)
+                        .font(MvxText.sectionHeader)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+
+                    Spacer(minLength: 0)
+
+                    if !controller.isSectionExpanded,
+                       let rootDisplayName = controller.rootDisplayName {
+                        Text(rootDisplayName)
+                            .font(MvxText.meta)
+                            .foregroundStyle(.tertiary)
+                            .lineLimit(1)
+                    }
+                }
+                .padding(.horizontal, MvxSpacing.md)
+                .padding(.vertical, MvxSpacing.xs)
+            }
+            .buttonStyle(.plain)
 
             if controller.isSectionExpanded {
                 content
+                    .padding(MvxSpacing.sm)
+                    .background(
+                        RoundedRectangle(cornerRadius: MvxRadius.card, style: .continuous)
+                            .fill(MvxSurface.cardTint)
+                    )
             }
         }
-        .padding(10)
-        .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(Color.white.opacity(0.04))
-        )
         .contextMenu {
             if controller.rootURL != nil {
                 Button("Refresh") {
@@ -592,40 +623,17 @@ struct WorkspaceFileTreeSectionView: View {
         }
     }
 
-    private var header: some View {
-        HStack(spacing: 8) {
-            Button {
-                withAnimation(.easeInOut(duration: 0.16)) {
-                    controller.isSectionExpanded.toggle()
-                }
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: controller.isSectionExpanded ? "chevron.down" : "chevron.right")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(.secondary)
-
-                    Text("Files")
-                        .font(.system(.headline, design: .rounded))
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-
-            Spacer(minLength: 0)
-        }
-    }
-
     @ViewBuilder
     private var content: some View {
         if let rootDisplayName = controller.rootDisplayName,
            let rootDisplayPath = controller.rootDisplayPath {
             VStack(alignment: .leading, spacing: 2) {
                 Text(rootDisplayName)
-                    .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                    .font(MvxText.cardTitle)
                     .lineLimit(1)
 
                 Text(rootDisplayPath)
-                    .font(.system(.caption2, design: .monospaced))
+                    .font(MvxText.rowContext)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
@@ -636,13 +644,13 @@ struct WorkspaceFileTreeSectionView: View {
                         .controlSize(.small)
 
                     Text("Loading files…")
-                        .font(.system(.caption, design: .rounded))
+                        .font(MvxText.meta)
                         .foregroundStyle(.secondary)
                 }
                 .padding(.vertical, 6)
             } else if controller.rootNodes.isEmpty {
                 Text(rootEmptyMessage)
-                    .font(.system(.caption, design: .rounded))
+                    .font(MvxText.meta)
                     .foregroundStyle(.tertiary)
                     .italic()
                     .padding(.vertical, 6)
@@ -667,7 +675,7 @@ struct WorkspaceFileTreeSectionView: View {
             }
         } else {
             Text("No working directory captured yet.")
-                .font(.system(.caption, design: .rounded))
+                .font(MvxText.meta)
                 .foregroundStyle(.secondary)
                 .padding(.vertical, 6)
         }
@@ -753,7 +761,7 @@ private struct WorkspaceFileTreeNodeList: View {
 
     private func statusRow(_ label: String, depth: Int) -> some View {
         Text(label)
-            .font(.system(.caption, design: .monospaced))
+            .font(MvxText.rowContext)
             .foregroundStyle(.tertiary)
             .italic()
             .padding(.leading, CGFloat(depth) * 12 + 18)
@@ -822,25 +830,25 @@ private struct WorkspaceFileTreeRow: View {
         return HStack(spacing: 5) {
             if node.isExpandable {
                 Image(systemName: node.isExpanded ? "chevron.down" : "chevron.right")
-                    .font(.system(size: 8, weight: .bold))
+                    .font(.system(size: MvxIcon.glyph - 2, weight: .bold))
                     .foregroundStyle(.secondary)
                     .frame(width: 8)
             }
 
             Image(systemName: iconDescriptor.symbolName)
-                .font(.system(size: 11, weight: .semibold))
+                .font(.system(size: MvxIcon.glyph, weight: .semibold))
                 .foregroundStyle(iconDescriptor.color)
                 .frame(width: 12)
 
             Text(node.name)
-                .font(.system(.caption, design: .monospaced))
+                .font(MvxText.rowContext)
                 .foregroundStyle(textColor)
                 .lineLimit(1)
                 .italic(node.kind == .placeholder)
 
             if let childCount = folderChildCount {
                 Text("\(childCount)")
-                    .font(.system(.caption2, design: .monospaced).weight(.semibold))
+                    .font(MvxText.metaMono)
                     .foregroundStyle(.tertiary)
                     .padding(.horizontal, 4)
                     .padding(.vertical, 1)

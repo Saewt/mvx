@@ -28,9 +28,9 @@ public struct WorkspaceCardVisualState: Equatable {
             isActive: isActive,
             showsGitStatus: metadata?.hasGitStatus ?? false,
             showsAttention: showsAttention,
-            backgroundOpacity: isActive ? 0.18 : 0.04,
-            borderOpacity: isActive ? (showsAttention ? 0.78 : 0.7) : (showsAttention ? 0.18 : 0.08),
-            glowOpacity: isActive ? (showsAttention ? 0.28 : 0.22) : 0,
+            backgroundOpacity: isActive ? 0.12 : 0,
+            borderOpacity: 0,
+            glowOpacity: 0,
             glowColorName: glowColorName
         )
     }
@@ -58,6 +58,9 @@ public struct SessionSidebarView: View {
     @State private var pendingRenameWorkspaceID: UUID?
     @State private var workspaceRenameController = SessionTabRenameController()
     @State private var durationReferenceDate = Date()
+    @State private var attentionPulseOpacity: Double = 1.0
+    @State private var isNotesPopoverPresented = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     public init(
         workspace: SessionWorkspace,
@@ -79,14 +82,43 @@ public struct SessionSidebarView: View {
         let metadata = workspace.workspaceMetadata
         let focusedSessionID = workspace.workspaceGraph.focusedSessionID
 
-        VStack(spacing: 12) {
-            HStack(spacing: 10) {
+        VStack(spacing: MvxSpacing.md) {
+            HStack(spacing: MvxSpacing.sm) {
                 Text("MVX")
-                    .font(.system(.caption, design: .monospaced).weight(.heavy))
+                    .font(MvxText.wordmark)
                     .tracking(4)
                     .foregroundStyle(.secondary)
-                    .layoutPriority(1)
-                    .fixedSize()
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .layoutPriority(0)
+
+                if chrome.attentionCount > 0 {
+                    Button {
+                        _ = commandHandler.perform(.nextAttention)
+                    } label: {
+                        HStack(spacing: 3) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.system(size: MvxIcon.glyph, weight: .bold))
+                            Text("\(chrome.attentionCount)")
+                                .font(MvxText.meta)
+                        }
+                        .foregroundStyle(chrome.attentionIsError ? .red : .orange)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(
+                            RoundedRectangle(cornerRadius: MvxRadius.control / 2, style: .continuous)
+                                .fill(MvxSurface.cardTint)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .opacity(chrome.attentionCount > 0 ? attentionPulseOpacity : 1)
+                    .animation(
+                        chrome.attentionCount > 0 && !reduceMotion ? MvxMotion.pulse : .none,
+                        value: attentionPulseOpacity
+                    )
+                    .help("Jump to next session needing attention (\(chrome.attentionCount))")
+                    .accessibilityLabel("Jump to next session needing attention (\(chrome.attentionCount))")
+                }
 
                 Spacer()
 
@@ -94,75 +126,83 @@ public struct SessionSidebarView: View {
                     railActionButton(action)
                 }
 
-                WorkspaceNotesCardView(workspace: workspace, metadata: metadata)
+                Menu {
+                    Button {
+                        isNotesPopoverPresented = true
+                    } label: {
+                        Label("Notes", systemImage: "note.text")
+                    }
 
-                chromeButton(symbolName: "folder.badge.plus", tooltip: "New Group", action: createGroup)
-                    .accessibilityLabel("New Group")
+                    Button {
+                        createGroup()
+                    } label: {
+                        Label("New Group", systemImage: "folder.badge.plus")
+                    }
+                } label: {
+                    chromeButtonLabel(symbolName: "ellipsis", isEnabled: true)
+                }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+                .help("More")
+                .accessibilityLabel("More")
 
                 if let onCollapse {
                     chromeButton(symbolName: "chevron.left", tooltip: "Hide Sidebar", action: onCollapse)
                         .accessibilityLabel("Hide Sidebar")
+                        .layoutPriority(3)
                 }
             }
-            .padding(.top, 10)
+            .padding(.top, MvxLayout.topChromeInset)
+            .padding(.leading, MvxLayout.titleLeadingInset)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(alignment: .topTrailing) {
+                WorkspaceNotesCardView(
+                    workspace: workspace,
+                    metadata: metadata,
+                    isPresented: $isNotesPopoverPresented,
+                    showsButton: false
+                )
+            }
 
             if let registry {
                 workspaceSwitcher(registry: registry)
             }
 
-            VStack(alignment: .leading, spacing: 6) {
-                Text(metadata.branchName)
-                    .font(.system(.subheadline, design: .monospaced))
-                    .lineLimit(1)
+            MvxSectionHeader(title: "Sessions", count: chrome.sessionCount)
 
-                Text(metadata.reviewState.label)
-                    .font(.system(.caption, design: .rounded))
-                    .foregroundStyle(.secondary)
-
-                Text("\(metadata.notificationCount) alerts · \(metadata.paneCount) pane\(metadata.paneCount == 1 ? "" : "s")")
-                    .font(.system(.caption2, design: .rounded))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+            ScrollView {
+                LazyVStack(spacing: 4) {
+                    sidebarSections(focusedSessionID: focusedSessionID)
+                }
+                .frame(maxWidth: .infinity)
+                .animation(reduceMotion ? .none : MvxMotion.standard, value: workspace.sessions.map(\.id))
             }
-            .padding(10)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(Color.white.opacity(0.04))
-            )
+            .scrollIndicators(.never)
+            .frame(maxHeight: .infinity)
+
+            Rectangle()
+                .fill(MvxSurface.hairline)
+                .frame(height: 1)
 
             WorkspaceFileTreeSectionView(
                 controller: fileTreeController,
                 workspace: workspace
             )
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(chrome.activeSessionTitle ?? "Sessions")
-                    .font(.system(.headline, design: .rounded))
-                    .lineLimit(1)
-
-                Text("\(chrome.sessionCount) session\(chrome.sessionCount == 1 ? "" : "s")")
-                    .font(.system(.caption, design: .rounded))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-
-            ScrollView {
-                LazyVStack(spacing: 6) {
-                    sidebarSections(focusedSessionID: focusedSessionID)
-                }
-                .frame(maxWidth: .infinity)
-            }
-            .scrollIndicators(.never)
         }
-        .padding(.horizontal, 10)
-        .padding(.bottom, 12)
+        .padding(.horizontal, MvxSpacing.sm)
+        .padding(.bottom, MvxSpacing.md)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(Color(red: 0.09, green: 0.10, blue: 0.13))
+        .background(MvxSurface.sidebar)
         .onAppear {
             fileTreeController.bind(to: workspace)
             _ = fileTreeController.syncFromWorkspace()
+            updateAttentionPulse(hasAttention: chrome.attentionCount > 0)
+        }
+        .onChange(of: chrome.attentionCount) { attentionCount in
+            updateAttentionPulse(hasAttention: attentionCount > 0)
+        }
+        .onChange(of: reduceMotion) { _ in
+            updateAttentionPulse(hasAttention: chrome.attentionCount > 0)
         }
         .onChange(of: workspace.activeSessionID) { _ in
             fileTreeController.bind(to: workspace)
@@ -178,185 +218,128 @@ public struct SessionSidebarView: View {
 
     @ViewBuilder
     private func workspaceSwitcher(registry: WorkspaceRegistry) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                Text("Workspaces")
-                    .font(.system(.caption, design: .rounded))
-                    .foregroundStyle(.secondary)
-
-                Spacer(minLength: 0)
+        VStack(alignment: .leading, spacing: MvxSpacing.xs) {
+            HStack(spacing: MvxSpacing.xs) {
+                MvxSectionHeader(title: "Workspaces")
 
                 chromeButton(symbolName: "plus", tooltip: "New Workspace") {
                     createWorkspace(in: registry)
                 }
                 .accessibilityLabel("New Workspace")
             }
+            .padding(.trailing, MvxSpacing.md)
 
-            ForEach(registry.entries) { entry in
-                let isActive = registry.activeWorkspaceID == entry.id
-                let metadata = registry.cardMetadata(for: entry.id)
-                let isRenaming = pendingRenameWorkspaceID == entry.id && workspaceRenameController.isRenaming
-                let visualState = WorkspaceCardVisualState.resolve(
-                    isActive: isActive,
-                    metadata: metadata
+            ScrollView {
+                LazyVStack(spacing: 2) {
+                    ForEach(registry.entries) { entry in
+                        workspaceRow(entry: entry, registry: registry)
+                    }
+                }
+            }
+            .scrollIndicators(.never)
+            .frame(maxHeight: workspaceSwitcherMaxHeight(for: registry.entries.count))
+        }
+    }
+
+    private func workspaceSwitcherMaxHeight(for count: Int) -> CGFloat {
+        min(CGFloat(max(count, 1)) * 24, 76)
+    }
+
+    private func workspaceRow(entry: WorkspaceEntry, registry: WorkspaceRegistry) -> some View {
+        let isActive = registry.activeWorkspaceID == entry.id
+        let metadata = registry.cardMetadata(for: entry.id)
+        let isRenaming = pendingRenameWorkspaceID == entry.id && workspaceRenameController.isRenaming
+        let visualState = WorkspaceCardVisualState.resolve(
+            isActive: isActive,
+            metadata: metadata
+        )
+
+        return HStack(spacing: MvxLayout.indicatorGap) {
+            Color.clear
+                .frame(width: MvxLayout.indicatorLane)
+
+            if isRenaming {
+                SessionInlineRenameField(
+                    text: Binding(
+                        get: { workspaceRenameController.draftTitle },
+                        set: { workspaceRenameController.updateDraft($0) }
+                    ),
+                    activationID: workspaceRenameController.activationID,
+                    selectionBehavior: workspaceRenameController.selectionBehavior,
+                    onCommit: { commitWorkspaceRename(entry: entry, registry: registry) },
+                    onCancel: cancelWorkspaceRename
                 )
-                let glowColor = workspaceCardGlowColor(for: visualState)
+            } else {
+                Text(metadata?.name ?? entry.name)
+                    .font(MvxText.meta)
+                    .foregroundStyle(isActive ? Color.primary : Color.secondary)
+                    .lineLimit(1)
+            }
 
-                VStack(alignment: .leading, spacing: 7) {
-                    HStack(spacing: 8) {
+            Spacer(minLength: 0)
+
+            if let metadata {
+                HStack(spacing: 4) {
+                    if metadata.errorCount > 0 {
+                        Circle()
+                            .fill(MvxStatusStyle.color(forLegacyAgentColorName: "red"))
+                            .frame(width: MvxIcon.statusDot - 3, height: MvxIcon.statusDot - 3)
+                    }
+                    if metadata.waitingCount > 0 {
+                        Circle()
+                            .fill(MvxStatusStyle.color(forLegacyAgentColorName: "orange"))
+                            .frame(width: MvxIcon.statusDot - 3, height: MvxIcon.statusDot - 3)
+                    }
+                }
+
+                Text("\(metadata.paneCount)")
+                    .font(MvxText.meta)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 1)
+                    .background(
                         Capsule(style: .continuous)
-                            .fill(isActive ? Color.accentColor : Color.gray.opacity(0.35))
-                            .frame(width: isActive ? 14 : 8, height: 5)
-
-                        if isRenaming {
-                            SessionInlineRenameField(
-                                text: Binding(
-                                    get: { workspaceRenameController.draftTitle },
-                                    set: { workspaceRenameController.updateDraft($0) }
-                                ),
-                                activationID: workspaceRenameController.activationID,
-                                selectionBehavior: workspaceRenameController.selectionBehavior,
-                                onCommit: { commitWorkspaceRename(entry: entry, registry: registry) },
-                                onCancel: cancelWorkspaceRename
-                            )
-                        } else {
-                            Text(metadata?.name ?? entry.name)
-                                .font(.system(.subheadline, design: .rounded).weight(.semibold))
-                                .lineLimit(1)
-                        }
-
-                        Spacer(minLength: 0)
-
-                        if let metadata {
-                            workspaceMetricBadge(
-                                "\(metadata.paneCount) pane\(metadata.paneCount == 1 ? "" : "s")"
-                            )
-                        }
-                    }
-
-                    if let metadata {
-                        Text("\(metadata.sessionCount) session\(metadata.sessionCount == 1 ? "" : "s") · \(metadata.groupCount) group\(metadata.groupCount == 1 ? "" : "s") · \(metadata.paneCount) pane\(metadata.paneCount == 1 ? "" : "s")")
-                            .font(.system(.caption2, design: .rounded))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
-
-                    Text(metadata?.branchName ?? "No Branch")
-                        .font(.system(.caption, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-
-                    HStack(spacing: 8) {
-                        if let addedCount = metadata?.gitAddedCount,
-                           let removedCount = metadata?.gitRemovedCount {
-                            Text("+\(addedCount)")
-                                .font(.system(.caption2, design: .monospaced).weight(.semibold))
-                                .foregroundStyle(.green)
-
-                            Text("-\(removedCount)")
-                                .font(.system(.caption2, design: .monospaced).weight(.semibold))
-                                .foregroundStyle(.red)
-                        }
-
-                        if let metadata, metadata.waitingCount > 0 {
-                            workspaceMetricBadge("\(metadata.waitingCount) waiting")
-                        }
-
-                        if let metadata, metadata.errorCount > 0 {
-                            workspaceMetricBadge("\(metadata.errorCount) error\(metadata.errorCount == 1 ? "" : "s")")
-                        }
-
-                        Spacer(minLength: 0)
-
-                        if let metadata, metadata.notificationCount > 0 {
-                            workspaceMetricBadge(
-                                "\(metadata.notificationCount) alert\(metadata.notificationCount == 1 ? "" : "s")"
-                            )
-                        }
-                    }
-                }
-                .padding(.vertical, 9)
-                .padding(.horizontal, 10)
-                .background(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(
-                            isActive
-                                ? Color.accentColor.opacity(visualState.backgroundOpacity)
-                                : Color.white.opacity(visualState.backgroundOpacity)
-                        )
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .stroke(
-                            isActive
-                                ? glowColor.opacity(visualState.borderOpacity)
-                                : (visualState.showsAttention
-                                    ? glowColor.opacity(visualState.borderOpacity)
-                                    : Color.white.opacity(visualState.borderOpacity)),
-                            lineWidth: 1
-                        )
-                )
-                .shadow(
-                    color: isActive ? glowColor.opacity(visualState.glowOpacity) : .clear,
-                    radius: 10
-                )
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    guard !isRenaming else {
-                        return
-                    }
-                    _ = registry.activateWorkspace(id: entry.id)
-                }
-                .contextMenu {
-                    Button("Rename Workspace") {
-                        beginWorkspaceRename(entry: entry)
-                    }
-
-                    Button("Close Workspace") {
-                        _ = registry.closeWorkspace(id: entry.id)
-                    }
-                    .disabled(registry.entries.count <= 1)
-                }
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel(
-                    Text(
-                        metadata.map {
-                            "\($0.name), \($0.sessionCount) sessions, \($0.groupCount) groups, \($0.paneCount) panes"
-                        } ?? entry.name
+                            .fill(MvxSurface.cardTint)
                     )
-                )
             }
         }
-        .padding(10)
+        .padding(.vertical, 3)
+        .padding(.horizontal, MvxSpacing.md)
         .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(Color.white.opacity(0.03))
+            RoundedRectangle(cornerRadius: MvxRadius.control, style: .continuous)
+                .fill(isActive ? Color.accentColor.opacity(visualState.backgroundOpacity) : Color.clear)
         )
-    }
-
-    private func workspaceMetricBadge(_ label: String) -> some View {
-        Text(label)
-            .font(.system(.caption2, design: .rounded))
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 3)
-            .background(
-                Capsule(style: .continuous)
-                    .fill(Color.white.opacity(0.05))
-            )
-    }
-
-    private func workspaceCardGlowColor(for visualState: WorkspaceCardVisualState) -> Color {
-        switch visualState.glowColorName {
-        case "red":
-            return .red
-        case "orange":
-            return .orange
-        case "accent":
-            return .accentColor
-        default:
-            return .clear
+        .overlay(alignment: .leading) {
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                .fill(isActive ? Color.accentColor : Color.clear)
+                .frame(width: 2)
+                .padding(.vertical, 4)
         }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            guard !isRenaming else {
+                return
+            }
+            _ = registry.activateWorkspace(id: entry.id)
+        }
+        .contextMenu {
+            Button("Rename Workspace") {
+                beginWorkspaceRename(entry: entry)
+            }
+
+            Button("Close Workspace") {
+                _ = registry.closeWorkspace(id: entry.id)
+            }
+            .disabled(registry.entries.count <= 1)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(
+            Text(
+                metadata.map {
+                    "\($0.name), \($0.sessionCount) sessions, \($0.groupCount) groups, \($0.paneCount) panes"
+                } ?? entry.name
+            )
+        )
     }
 
     private func railActionButton(_ action: SessionRailChromeState.TopAction) -> some View {
@@ -380,10 +363,21 @@ public struct SessionSidebarView: View {
             let sectionState = SessionSidebarSectionState.resolve(workspace: workspace)
 
             if sectionState.showsUngroupedSection {
-                ungroupedSectionHeader(
-                    sessionCount: ungrouped.count,
-                    isActive: workspace.activeGroupID == nil
-                )
+                MvxSectionHeader(title: "Ungrouped", count: ungrouped.count)
+                    .background(
+                        RoundedRectangle(cornerRadius: MvxRadius.control, style: .continuous)
+                            .fill(workspace.activeGroupID == nil ? MvxSurface.selectionTint : Color.clear)
+                    )
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        _ = workspace.selectGroup(id: nil)
+                    }
+                    .dropDestination(for: String.self) { identifiers, _ in
+                        guard let identifier = identifiers.first else {
+                            return false
+                        }
+                        return workspace.handleDroppedSession(identifier: identifier, toGroup: nil)
+                    }
 
                 ForEach(ungrouped) { descriptor in
                     sessionRow(for: descriptor, focusedSessionID: focusedSessionID)
@@ -413,54 +407,21 @@ public struct SessionSidebarView: View {
     }
 
     private func sessionRow(for descriptor: SessionDescriptor, focusedSessionID: UUID?) -> some View {
-        SessionTabRowView(
+        let identity = SessionDisplayIdentityResolver.resolve(
+            descriptor: descriptor,
+            visibleDescriptors: workspace.sessions,
+            branchName: workspace.workspaceMetadata.branchName,
+            gitChangeSummary: workspace.gitChangeSummary(for: descriptor.id)
+        )
+
+        return SessionTabRowView(
             workspace: workspace,
             descriptor: descriptor,
+            displayIdentity: identity,
             isFocusedInTiling: descriptor.id == focusedSessionID,
             gitChangeSummary: workspace.gitChangeSummary(for: descriptor.id),
             durationReferenceDate: durationReferenceDate
         )
-    }
-
-    private func ungroupedSectionHeader(sessionCount: Int, isActive: Bool) -> some View {
-        HStack(spacing: 8) {
-            Text("Ungrouped")
-                .font(.system(.caption, design: .rounded))
-                .foregroundStyle(.secondary)
-
-            Spacer(minLength: 0)
-
-            Text("\(sessionCount)")
-                .font(.system(.caption2, design: .rounded))
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 3)
-                .background(
-                    Capsule(style: .continuous)
-                        .fill(Color.white.opacity(0.05))
-                )
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(isActive ? Color.accentColor.opacity(0.14) : Color.clear)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(isActive ? Color.accentColor.opacity(0.7) : Color.clear, lineWidth: 1)
-        )
-        .contentShape(Rectangle())
-        .onTapGesture {
-            _ = workspace.selectGroup(id: nil)
-        }
-        .dropDestination(for: String.self) { identifiers, _ in
-            guard let identifier = identifiers.first else {
-                return false
-            }
-
-            return workspace.handleDroppedSession(identifier: identifier, toGroup: nil)
-        }
     }
 
     private func chromeButton(
@@ -476,17 +437,21 @@ public struct SessionSidebarView: View {
 
             action()
         } label: {
-            Image(systemName: symbolName)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(isEnabled ? Color.primary : Color.secondary.opacity(0.72))
-                .frame(width: 26, height: 26)
-                .background(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(Color.white.opacity(isEnabled ? 0.08 : 0.04))
-                )
+            chromeButtonLabel(symbolName: symbolName, isEnabled: isEnabled)
         }
         .buttonStyle(.plain)
         .help(tooltip ?? "")
+    }
+
+    private func chromeButtonLabel(symbolName: String, isEnabled: Bool) -> some View {
+        Image(systemName: symbolName)
+            .font(.system(size: MvxIcon.controlSymbolSize, weight: .semibold))
+            .foregroundStyle(isEnabled ? Color.primary : Color.secondary.opacity(0.72))
+            .frame(width: MvxIcon.controlButtonSize, height: MvxIcon.controlButtonSize)
+            .background(
+                RoundedRectangle(cornerRadius: MvxRadius.control, style: .continuous)
+                    .fill(isEnabled ? MvxSurface.hairline : MvxSurface.cardTint)
+            )
     }
 
     private func createGroup() {
@@ -525,5 +490,9 @@ public struct SessionSidebarView: View {
             index += 1
         }
         return "Workspace \(index)"
+    }
+
+    private func updateAttentionPulse(hasAttention: Bool) {
+        attentionPulseOpacity = hasAttention && !reduceMotion ? 0.6 : 1.0
     }
 }

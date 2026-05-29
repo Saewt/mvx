@@ -15,6 +15,13 @@ public struct SessionTabRowVisualState: Equatable {
     public let gitRemovedCount: Int?
     public let focusBorderOpacity: Double
     public let focusGlowOpacity: Double
+    public let needsAttention: Bool
+    public let attentionColorName: String?
+    public let attentionLabel: String?
+    public let isRunning: Bool
+    public let statusRailColorName: String?
+    public let railColorName: String?
+    public let statusSymbolName: String?
 
     public static func resolve(
         descriptor: SessionDescriptor,
@@ -25,6 +32,18 @@ public struct SessionTabRowVisualState: Equatable {
         let isSelected = descriptor.id == activeSessionID
         let showsAgentBadge = descriptor.agentStatus.showsBadge
         let showsGitBadge = gitChangeSummary != nil
+        let needsAttention = descriptor.agentStatus.needsAttention
+        let agentIsRunning = descriptor.agentStatus == .running
+        let resolvedColorName = badgeColorName(for: descriptor.agentStatus)
+        let attentionColorName: String?
+        let attentionLabel: String?
+        if needsAttention {
+            attentionColorName = resolvedColorName
+            attentionLabel = descriptor.agentStatus.attentionLabel
+        } else {
+            attentionColorName = nil
+            attentionLabel = nil
+        }
         return SessionTabRowVisualState(
             isSelected: isSelected,
             isFocusedInTiling: isFocusedInTiling,
@@ -33,12 +52,19 @@ public struct SessionTabRowVisualState: Equatable {
             showsAgentBadge: showsAgentBadge,
             agentBadgeShapeName: showsAgentBadge ? "dot" : nil,
             agentBadgeLabel: descriptor.agentStatus.badgeLabel,
-            agentBadgeColorName: badgeColorName(for: descriptor.agentStatus),
+            agentBadgeColorName: resolvedColorName,
             showsGitBadge: showsGitBadge,
             gitAddedCount: gitChangeSummary?.addedCount,
             gitRemovedCount: gitChangeSummary?.removedCount,
-            focusBorderOpacity: isFocusedInTiling ? (isSelected ? 0.78 : 0.42) : 0,
-            focusGlowOpacity: isFocusedInTiling ? (isSelected ? 0.26 : 0.18) : 0
+            focusBorderOpacity: isFocusedInTiling ? (isSelected ? 0.62 : 0.38) : 0,
+            focusGlowOpacity: isFocusedInTiling ? (isSelected ? 0.08 : 0.05) : 0,
+            needsAttention: needsAttention,
+            attentionColorName: attentionColorName,
+            attentionLabel: attentionLabel,
+            isRunning: agentIsRunning,
+            statusRailColorName: resolvedColorName,
+            railColorName: isSelected ? "accent" : resolvedColorName,
+            statusSymbolName: MvxStatusStyle.symbolName(for: descriptor.agentStatus)
         )
     }
 
@@ -158,15 +184,9 @@ struct SessionTabSplitMenuState: Equatable {
         let eligibleDescriptors = workspace.sessions.filter { descriptor in
             descriptor.id != sourceSessionID && workspace.paneID(for: descriptor.id) != nil
         }
-        let titleCounts = eligibleDescriptors.reduce(into: [String: Int]()) { counts, descriptor in
-            counts[descriptor.displayTitle, default: 0] += 1
-        }
-
+        let resolvedTitles = SessionDisplayIdentityResolver.resolvedTitles(for: eligibleDescriptors)
         let candidates = eligibleDescriptors.map { descriptor in
-            let titleCount = titleCounts[descriptor.displayTitle] ?? 0
-            let title = titleCount > 1
-                ? "\(descriptor.displayTitle) (#\(descriptor.ordinal))"
-                : descriptor.displayTitle
+            let title = resolvedTitles[descriptor.id] ?? descriptor.displayTitle
             return SessionTabSplitCandidate(id: descriptor.id, title: title)
         }
 
@@ -316,105 +336,101 @@ struct SessionInlineRenameField: NSViewRepresentable {
 public struct SessionTabRowView: View {
     @ObservedObject private var workspace: SessionWorkspace
     private let descriptor: SessionDescriptor
+    private let displayIdentity: SessionDisplayIdentity?
     private let isFocusedInTiling: Bool
     private let gitChangeSummary: WorkspaceGitChangeSummary?
     private let durationReferenceDate: Date
 
     @State private var renameController = SessionTabRenameController()
+    @State private var runningPulseOpacity: Double = 1.0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     public init(
         workspace: SessionWorkspace,
         descriptor: SessionDescriptor,
+        displayIdentity: SessionDisplayIdentity? = nil,
         isFocusedInTiling: Bool = false,
         gitChangeSummary: WorkspaceGitChangeSummary? = nil,
         durationReferenceDate: Date = Date()
     ) {
         self.workspace = workspace
         self.descriptor = descriptor
+        self.displayIdentity = displayIdentity
         self.isFocusedInTiling = isFocusedInTiling
         self.gitChangeSummary = gitChangeSummary
         self.durationReferenceDate = durationReferenceDate
     }
 
     public var body: some View {
-        HStack(spacing: 8) {
-            selectionIndicator
+        HStack(alignment: .top, spacing: MvxLayout.indicatorGap) {
+            statusIndicatorLane
+            VStack(alignment: .leading, spacing: 2) {
+                if renameController.isRenaming {
+                    SessionInlineRenameField(
+                        text: Binding(
+                            get: { renameController.draftTitle },
+                            set: { renameController.updateDraft($0) }
+                        ),
+                        activationID: renameController.activationID,
+                        selectionBehavior: renameController.selectionBehavior,
+                        onCommit: commitRename,
+                        onCancel: cancelRename
+                    )
+                } else {
+                    HStack(spacing: 6) {
+                        Text(resolvedDisplayIdentity.title)
+                            .font(MvxText.rowTitle)
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
 
-            if visualState.showsAgentBadge {
-                Circle()
-                    .fill(agentBadgeColor)
-                    .frame(width: 9, height: 9)
-                    .help(visualState.agentBadgeLabel ?? "")
-                    .accessibilityLabel(Text(visualState.agentBadgeLabel ?? ""))
-            }
-
-            if renameController.isRenaming {
-                SessionInlineRenameField(
-                    text: Binding(
-                        get: { renameController.draftTitle },
-                        set: { renameController.updateDraft($0) }
-                    ),
-                    activationID: renameController.activationID,
-                    selectionBehavior: renameController.selectionBehavior,
-                    onCommit: commitRename,
-                    onCancel: cancelRename
-                )
-            } else {
-                HStack(spacing: 6) {
-                    Text(descriptor.displayTitle)
-                        .font(.system(.body, design: .monospaced))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-
-                    if let sessionStartedAt = workspace.sessionStartedAt(for: descriptor.id) {
-                        let durationState = SessionTabDurationState.resolve(
-                            startedAt: sessionStartedAt,
-                            isRenaming: renameController.isRenaming,
-                            referenceDate: durationReferenceDate
-                        )
-
-                        if let label = durationState.label {
-                            Text(label)
-                                .font(.system(.caption2, design: .monospaced).weight(.medium))
+                        if let durationLabel {
+                            Text(durationLabel)
+                                .font(MvxText.metaMono)
                                 .foregroundStyle(.secondary)
                                 .fixedSize(horizontal: true, vertical: false)
                         }
+
+                        Spacer(minLength: 0)
+
+                        if visualState.needsAttention && !visualState.isSelected,
+                           let attentionLabel = visualState.attentionLabel {
+                            Text(attentionLabel)
+                                .font(MvxText.meta)
+                                .foregroundStyle(
+                                    MvxStatusStyle.color(forLegacyAgentColorName: visualState.attentionColorName)
+                                )
+                                .lineLimit(1)
+                        }
+                    }
+
+                    if let contextLine = resolvedDisplayIdentity.contextLine {
+                        Text(contextLine)
+                            .font(MvxText.rowContext)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
                     }
                 }
             }
-
-            Spacer(minLength: 0)
-
-            if visualState.showsGitBadge,
-               let gitAddedCount = visualState.gitAddedCount,
-               let gitRemovedCount = visualState.gitRemovedCount {
-                HStack(spacing: 4) {
-                    Text("+\(gitAddedCount)")
-                        .font(.system(.caption2, design: .monospaced).weight(.semibold))
-                        .foregroundStyle(.green)
-
-                    Text("-\(gitRemovedCount)")
-                        .font(.system(.caption2, design: .monospaced).weight(.semibold))
-                        .foregroundStyle(.red)
-                }
-            }
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
+        .padding(.horizontal, MvxSpacing.md)
+        .padding(.vertical, 5)
         .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(visualState.isSelected ? Color.accentColor.opacity(0.16) : Color.clear)
+            RoundedRectangle(cornerRadius: MvxRadius.control, style: .continuous)
+                .fill(visualState.isSelected ? MvxSurface.selectedRow : Color.clear)
         )
+        .overlay(alignment: .leading) {
+            selectionIndicator
+        }
         .overlay(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
+            RoundedRectangle(cornerRadius: MvxRadius.control, style: .continuous)
                 .stroke(
                     Color.accentColor.opacity(visualState.focusBorderOpacity),
-                    lineWidth: visualState.isFocusedInTiling ? 1.5 : 0
+                    lineWidth: visualState.isFocusedInTiling ? 1 : 0
                 )
         )
         .shadow(
             color: Color.accentColor.opacity(visualState.focusGlowOpacity),
-            radius: visualState.isFocusedInTiling ? 10 : 0
+            radius: visualState.isFocusedInTiling ? 6 : 0
         )
         .contentShape(Rectangle())
         .onTapGesture {
@@ -456,6 +472,20 @@ public struct SessionTabRowView: View {
                 _ = workspace.closeSession(id: descriptor.id)
             }
         }
+        .onAppear {
+            if visualState.isRunning {
+                runningPulseOpacity = 0.5
+            } else {
+                runningPulseOpacity = 1.0
+            }
+        }
+        .onChange(of: visualState.isRunning) { isRunning in
+            if isRunning {
+                runningPulseOpacity = 0.5
+            } else {
+                runningPulseOpacity = 1.0
+            }
+        }
     }
 
     private var visualState: SessionTabRowVisualState {
@@ -465,6 +495,27 @@ public struct SessionTabRowView: View {
             isFocusedInTiling: isFocusedInTiling,
             gitChangeSummary: gitChangeSummary
         )
+    }
+
+    private var resolvedDisplayIdentity: SessionDisplayIdentity {
+        displayIdentity ?? SessionDisplayIdentityResolver.resolve(
+            descriptor: descriptor,
+            visibleDescriptors: [descriptor],
+            branchName: workspace.workspaceMetadata.branchName,
+            gitChangeSummary: gitChangeSummary
+        )
+    }
+
+    private var durationLabel: String? {
+        guard let sessionStartedAt = workspace.sessionStartedAt(for: descriptor.id) else {
+            return nil
+        }
+
+        return SessionTabDurationState.resolve(
+            startedAt: sessionStartedAt,
+            isRenaming: renameController.isRenaming,
+            referenceDate: durationReferenceDate
+        ).label
     }
 
     private var splitMenuState: SessionTabSplitMenuState {
@@ -494,41 +545,53 @@ public struct SessionTabRowView: View {
 
     @ViewBuilder
     private var selectionIndicator: some View {
-        if visualState.isSelected {
-            RoundedRectangle(cornerRadius: 2, style: .continuous)
-                .fill(selectionIndicatorColor)
-                .frame(width: 4, height: 16)
-        } else {
-            Circle()
-                .fill(selectionIndicatorColor.opacity(0.35))
-                .frame(width: 7, height: 7)
-        }
+        let color = selectionRailColor
+        RoundedRectangle(cornerRadius: 2, style: .continuous)
+            .fill(color)
+            .frame(width: visualState.isSelected ? MvxLayout.selectionBarWidth + 1 : MvxLayout.selectionBarWidth)
+            .frame(maxHeight: .infinity)
+            .opacity(visualState.isRunning && !visualState.isSelected ? runningPulseOpacity : 1)
+            .animation(
+                visualState.isRunning && !reduceMotion ? MvxMotion.pulse : .none,
+                value: runningPulseOpacity
+            )
+            .padding(.vertical, 5)
     }
 
-    private var selectionIndicatorColor: Color {
-        switch visualState.selectionIndicatorColorName {
-        case "accent":
-            return .accentColor
-        case "secondary":
-            return .secondary
-        default:
-            return .secondary
+    @ViewBuilder
+    private var statusIndicatorLane: some View {
+        ZStack {
+            if let symbolName = visualState.statusSymbolName {
+                Image(systemName: symbolName)
+                    .font(.system(size: MvxIcon.glyph, weight: .semibold))
+                    .foregroundStyle(
+                        MvxStatusStyle.color(forLegacyAgentColorName: visualState.agentBadgeColorName)
+                    )
+                    .opacity(visualState.isRunning ? runningPulseOpacity : 1)
+                    .animation(
+                        visualState.isRunning && !reduceMotion ? MvxMotion.pulse : .none,
+                        value: runningPulseOpacity
+                    )
+                    .help(visualState.agentBadgeLabel ?? "")
+                    .accessibilityLabel(Text(visualState.agentBadgeLabel ?? ""))
+            } else {
+                Color.clear
+            }
         }
+        .frame(width: MvxLayout.indicatorLane, height: MvxLayout.indicatorLane)
+        .padding(.top, 2)
     }
 
-    private var agentBadgeColor: Color {
-        switch visualState.agentBadgeColorName {
-        case "green":
-            return .green
-        case "orange":
-            return .orange
-        case "teal":
-            return .teal
-        case "red":
-            return .red
-        default:
-            return .clear
+    private var selectionRailColor: Color {
+        if let railColorName = visualState.railColorName {
+            if railColorName == "accent" {
+                return .accentColor
+            }
+
+            return MvxStatusStyle.color(forLegacyAgentColorName: railColorName)
         }
+
+        return .clear
     }
 
     private func commitRename() {

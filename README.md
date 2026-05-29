@@ -2,7 +2,7 @@
 <p align="center">A native macOS terminal workspace with agent status tracking, tiling layouts, and session persistence</p>
 
 <p align="center">
-  <img src="./mvx.png" alt="mvx screenshot" width="900" />
+  <img src="./mvximage2.png" alt="mvx screenshot" width="900" />
 </p>
 
 ## Features

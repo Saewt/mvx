@@ -56,7 +56,7 @@ struct MvxLauncher: App {
         _updateController = StateObject(wrappedValue: resolvedUpdateController)
     }
 
-    var body: some Scene {
+var body: some Scene {
         WindowGroup {
             Group {
                 if let blockedMessage {
@@ -78,32 +78,8 @@ struct MvxLauncher: App {
                     proxy.commandHandler?.isUpdateSheetPresented = true
                 }
             }
-            .sheet(
-                isPresented: Binding(
-                    get: { proxy.commandHandler?.isUpdateSheetPresented ?? false },
-                    set: { isPresented in
-                        if isPresented {
-                            proxy.commandHandler?.isUpdateSheetPresented = true
-                        } else {
-                            proxy.commandHandler?.dismissUpdateSheet()
-                        }
-                    }
-                )
-            ) {
-                if let commandHandler = proxy.commandHandler {
-                    UpdateView(
-                        controller: commandHandler.updateController ?? ReleaseUpdateController(),
-                        onClose: { commandHandler.isUpdateSheetPresented = false },
-                        onRestartRequested: {
-                            Self.performUpdateRestart(
-                                registry: registry,
-                                commandHandler: commandHandler
-                            )
-                        }
-                    )
-                }
-            }
         }
+        .windowStyle(.hiddenTitleBar)
         .commands {
             WorkspaceCommands(proxy: proxy)
         }
