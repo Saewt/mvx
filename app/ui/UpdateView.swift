@@ -43,8 +43,8 @@ public struct UpdateView: View {
         .padding(20)
         .frame(width: 380)
         .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color(red: 0.10, green: 0.10, blue: 0.11))
+            RoundedRectangle(cornerRadius: MvxRadius.container, style: .continuous)
+                .fill(MvxSurface.overlay)
         )
     }
 
@@ -162,7 +162,7 @@ public struct UpdateView: View {
         VStack(alignment: .leading, spacing: 8) {
             ProgressView(value: controller.downloadProgress)
                 .progressViewStyle(.linear)
-                .tint(Color(red: 0.31, green: 0.57, blue: 0.96))
+                .tint(.accentColor)
             HStack {
                 Spacer()
                 Button("Cancel") {

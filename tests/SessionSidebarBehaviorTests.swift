@@ -3,6 +3,39 @@ import XCTest
 
 @MainActor
 final class SessionSidebarBehaviorTests: XCTestCase {
+    func testPathLikeTerminalTitleUsesLeafName() {
+        XCTAssertEqual(
+            SessionNaming.automaticTitle(
+                terminalTitle: "~/desktop/codop",
+                workingDirectoryPath: "/tmp/ignored",
+                foregroundProcessName: "zsh",
+                fallbackOrdinal: 83
+            ),
+            "codop"
+        )
+        XCTAssertEqual(
+            SessionNaming.automaticTitle(
+                terminalTitle: "/",
+                workingDirectoryPath: "/tmp/ignored",
+                foregroundProcessName: "zsh",
+                fallbackOrdinal: 83
+            ),
+            "/"
+        )
+    }
+
+    func testNonPathTerminalTitleStaysVerbatim() {
+        XCTAssertEqual(
+            SessionNaming.automaticTitle(
+                terminalTitle: "Running tests",
+                workingDirectoryPath: "/Users/test/codop",
+                foregroundProcessName: "zsh",
+                fallbackOrdinal: 1
+            ),
+            "Running tests"
+        )
+    }
+
     func testAutoNamePreservesUserOverride() {
         let workspace = makeTestWorkspace(autoStartSessions: false)
         let firstID = try! XCTUnwrap(workspace.activeSessionID)
@@ -24,7 +57,98 @@ final class SessionSidebarBehaviorTests: XCTestCase {
         XCTAssertEqual(workspace.activeDescriptor?.displayTitle, "Pinned")
 
         XCTAssertTrue(workspace.renameSession(id: firstID, title: "   "))
-        XCTAssertEqual(workspace.activeDescriptor?.displayTitle, "tmp")
+        XCTAssertEqual(workspace.activeDescriptor?.displayTitle, "vim")
+    }
+
+    func testDisplayIdentityDisambiguatesDuplicateTitlesByProcessThenLocalRank() {
+        let first = SessionDescriptor(
+            ordinal: 1,
+            workingDirectoryPath: "/Users/test/codop",
+            foregroundProcessName: "claude"
+        )
+        let second = SessionDescriptor(
+            ordinal: 2,
+            workingDirectoryPath: "/Users/test/codop",
+            foregroundProcessName: "node"
+        )
+        let third = SessionDescriptor(
+            ordinal: 3,
+            workingDirectoryPath: "/Users/test/codop",
+            foregroundProcessName: "node"
+        )
+
+        let titles = SessionDisplayIdentityResolver.resolvedTitles(for: [first, second, third])
+
+        XCTAssertEqual(titles[first.id], "claude")
+        XCTAssertEqual(titles[second.id], "node")
+        XCTAssertEqual(titles[third.id], "node 2")
+    }
+
+    func testDisplayIdentityDisambiguatesDuplicateTitlesByLocalRank() {
+        let first = SessionDescriptor(
+            ordinal: 83,
+            workingDirectoryPath: "/Users/test/codop",
+            foregroundProcessName: "zsh"
+        )
+        let second = SessionDescriptor(
+            ordinal: 144,
+            workingDirectoryPath: "/Users/test/codop",
+            foregroundProcessName: "zsh"
+        )
+        let third = SessionDescriptor(
+            ordinal: 165,
+            workingDirectoryPath: "/Users/test/codop",
+            foregroundProcessName: "zsh"
+        )
+
+        let titles = SessionDisplayIdentityResolver.resolvedTitles(for: [third, first, second])
+
+        XCTAssertEqual(titles[first.id], "codop")
+        XCTAssertEqual(titles[second.id], "codop 2")
+        XCTAssertEqual(titles[third.id], "codop 3")
+    }
+
+    func testDisplayIdentityDoesNotMutateCustomTitleAndBuildsContextLine() {
+        let descriptor = SessionDescriptor(
+            ordinal: 1,
+            customTitle: "Pinned",
+            workingDirectoryPath: "/Users/test/codop",
+            foregroundProcessName: "claude"
+        )
+
+        let identity = SessionDisplayIdentityResolver.resolve(
+            descriptor: descriptor,
+            visibleDescriptors: [descriptor],
+            branchName: "main",
+            gitChangeSummary: WorkspaceGitChangeSummary(addedCount: 3, removedCount: 1)
+        )
+
+        XCTAssertEqual(identity.title, "Pinned")
+        XCTAssertEqual(descriptor.customTitle, "Pinned")
+        XCTAssertEqual(identity.contextLine, "codop  ·  main  ·  +3 -1  ·  claude")
+    }
+
+    func testDisplayIdentityDropsRepoFromContextWhenItMatchesBaseTitle() {
+        let first = SessionDescriptor(
+            ordinal: 83,
+            workingDirectoryPath: "/Users/test/codop",
+            foregroundProcessName: "zsh"
+        )
+        let second = SessionDescriptor(
+            ordinal: 144,
+            workingDirectoryPath: "/Users/test/codop",
+            foregroundProcessName: "zsh"
+        )
+
+        let identity = SessionDisplayIdentityResolver.resolve(
+            descriptor: second,
+            visibleDescriptors: [first, second],
+            branchName: "main",
+            gitChangeSummary: WorkspaceGitChangeSummary(addedCount: 30, removedCount: 2)
+        )
+
+        XCTAssertEqual(identity.title, "codop 2")
+        XCTAssertEqual(identity.contextLine, "main  ·  +30 -2")
     }
 
     func testRenameCommitsAndCancelsCleanly() {
@@ -249,7 +373,7 @@ final class SessionSidebarBehaviorTests: XCTestCase {
         XCTAssertFalse(state.candidates.contains(where: { $0.id == detached.id }))
     }
 
-    func testDuplicateSplitMenuTitlesAppendOrdinalSuffix() {
+    func testDuplicateSplitMenuTitlesUseLocalRankSuffix() {
         let workspace = makeTestWorkspace(autoStartSessions: false)
         let firstID = try! XCTUnwrap(workspace.activeSessionID)
 
@@ -268,11 +392,11 @@ final class SessionSidebarBehaviorTests: XCTestCase {
         XCTAssertEqual(state.sourceSessionID, focusedID)
         XCTAssertEqual(
             state.candidates.first(where: { $0.id == firstID })?.title,
-            "Pinned (#\(workspace.descriptor(for: firstID)?.ordinal ?? 0))"
+            "Pinned"
         )
         XCTAssertEqual(
             state.candidates.first(where: { $0.id == secondID })?.title,
-            "Pinned (#\(workspace.descriptor(for: secondID)?.ordinal ?? 0))"
+            "Pinned 2"
         )
     }
 
@@ -402,8 +526,9 @@ final class SessionSidebarBehaviorTests: XCTestCase {
         let inactiveState = WorkspaceCardVisualState.resolve(isActive: false, metadata: metadata)
 
         XCTAssertTrue(activeState.isActive)
-        XCTAssertTrue(activeState.glowOpacity > inactiveState.glowOpacity)
-        XCTAssertTrue(activeState.borderOpacity > inactiveState.borderOpacity)
+        XCTAssertTrue(activeState.backgroundOpacity > inactiveState.backgroundOpacity)
+        XCTAssertEqual(activeState.glowOpacity, 0)
+        XCTAssertEqual(activeState.borderOpacity, 0)
         XCTAssertFalse(activeState.showsGitStatus)
         XCTAssertTrue(activeState.showsAttention)
         XCTAssertEqual(activeState.glowColorName, "orange")
@@ -473,5 +598,162 @@ final class SessionSidebarBehaviorTests: XCTestCase {
             SessionGroupHeaderView.collapseActionLabel(isCollapsed: false),
             "Collapse Group"
         )
+    }
+
+    func testWaitingStatusSetsNeedsAttentionAndIsNotRunning() {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+        let activeID = try! XCTUnwrap(workspace.activeSessionID)
+
+        XCTAssertTrue(workspace.updateAgentStatus(id: activeID, status: .waiting))
+        let descriptor = try! XCTUnwrap(workspace.activeDescriptor)
+
+        let otherID = UUID()
+        let visualState = SessionTabRowVisualState.resolve(
+            descriptor: descriptor,
+            activeSessionID: otherID
+        )
+
+        XCTAssertTrue(visualState.needsAttention)
+        XCTAssertEqual(visualState.attentionColorName, "orange")
+        XCTAssertEqual(visualState.attentionLabel, "Waiting")
+        XCTAssertFalse(visualState.isRunning)
+        XCTAssertEqual(visualState.statusSymbolName, "hourglass")
+    }
+
+    func testErrorStatusSetsNeedsAttentionAndIsNotRunning() {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+        let activeID = try! XCTUnwrap(workspace.activeSessionID)
+
+        XCTAssertTrue(workspace.updateAgentStatus(id: activeID, status: .error))
+        let descriptor = try! XCTUnwrap(workspace.activeDescriptor)
+
+        let otherID = UUID()
+        let visualState = SessionTabRowVisualState.resolve(
+            descriptor: descriptor,
+            activeSessionID: otherID
+        )
+
+        XCTAssertTrue(visualState.needsAttention)
+        XCTAssertEqual(visualState.attentionColorName, "red")
+        XCTAssertEqual(visualState.attentionLabel, "Error")
+        XCTAssertFalse(visualState.isRunning)
+        XCTAssertEqual(visualState.statusSymbolName, "exclamationmark.triangle.fill")
+    }
+
+    func testRunningStatusSetsIsRunningWithoutAttention() {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+        let activeID = try! XCTUnwrap(workspace.activeSessionID)
+
+        XCTAssertTrue(workspace.updateAgentStatus(id: activeID, status: .running))
+        let descriptor = try! XCTUnwrap(workspace.activeDescriptor)
+
+        let otherID = UUID()
+        let visualState = SessionTabRowVisualState.resolve(
+            descriptor: descriptor,
+            activeSessionID: otherID
+        )
+
+        XCTAssertTrue(visualState.isRunning)
+        XCTAssertFalse(visualState.needsAttention)
+        XCTAssertNil(visualState.attentionColorName)
+        XCTAssertNil(visualState.attentionLabel)
+        XCTAssertEqual(visualState.statusSymbolName, "circle.fill")
+    }
+
+    func testDoneStatusHasNoAttentionAndIsNotRunning() {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+        let activeID = try! XCTUnwrap(workspace.activeSessionID)
+
+        XCTAssertTrue(workspace.updateAgentStatus(id: activeID, status: .done))
+        let descriptor = try! XCTUnwrap(workspace.activeDescriptor)
+
+        let otherID = UUID()
+        let visualState = SessionTabRowVisualState.resolve(
+            descriptor: descriptor,
+            activeSessionID: otherID
+        )
+
+        XCTAssertFalse(visualState.needsAttention)
+        XCTAssertFalse(visualState.isRunning)
+        XCTAssertNil(visualState.attentionColorName)
+        XCTAssertNil(visualState.attentionLabel)
+        XCTAssertTrue(visualState.showsAgentBadge)
+        XCTAssertEqual(visualState.agentBadgeColorName, "teal")
+        XCTAssertEqual(visualState.statusSymbolName, "checkmark")
+    }
+
+    func testNoneStatusHasNoAttentionAndIsNotRunning() {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+
+        let descriptor = try! XCTUnwrap(workspace.activeDescriptor)
+
+        let otherID = UUID()
+        let visualState = SessionTabRowVisualState.resolve(
+            descriptor: descriptor,
+            activeSessionID: otherID
+        )
+
+        XCTAssertFalse(visualState.needsAttention)
+        XCTAssertFalse(visualState.isRunning)
+        XCTAssertNil(visualState.attentionColorName)
+        XCTAssertNil(visualState.attentionLabel)
+        XCTAssertNil(visualState.statusSymbolName)
+    }
+
+    func testStatusSymbolNameMapsAgentStatus() {
+        XCTAssertNil(MvxStatusStyle.symbolName(for: .none))
+        XCTAssertEqual(MvxStatusStyle.symbolName(for: .running), "circle.fill")
+        XCTAssertEqual(MvxStatusStyle.symbolName(for: .waiting), "hourglass")
+        XCTAssertEqual(MvxStatusStyle.symbolName(for: .done), "checkmark")
+        XCTAssertEqual(MvxStatusStyle.symbolName(for: .error), "exclamationmark.triangle.fill")
+    }
+
+    func testSelectedErrorStatePreservesExistingAgentBadgeFields() {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+        let activeID = try! XCTUnwrap(workspace.activeSessionID)
+
+        XCTAssertTrue(workspace.updateAgentStatus(id: activeID, status: .error))
+        let descriptor = try! XCTUnwrap(workspace.activeDescriptor)
+        let visualState = SessionTabRowVisualState.resolve(
+            descriptor: descriptor,
+            activeSessionID: activeID
+        )
+
+        XCTAssertTrue(visualState.isSelected)
+        XCTAssertTrue(visualState.needsAttention)
+        XCTAssertEqual(visualState.selectionIndicatorStyleName, "bar")
+        XCTAssertEqual(visualState.selectionIndicatorColorName, "accent")
+        XCTAssertEqual(visualState.agentBadgeShapeName, "dot")
+        XCTAssertEqual(visualState.agentBadgeColorName, "red")
+        XCTAssertEqual(visualState.agentBadgeLabel, "Error")
+        XCTAssertFalse(visualState.isRunning)
+    }
+
+    func testStatusRailColorTracksStatusAndSelectionWins() {
+        let waiting = SessionDescriptor(ordinal: 1, agentStatus: .waiting)
+        let inactiveWaiting = SessionTabRowVisualState.resolve(
+            descriptor: waiting,
+            activeSessionID: UUID()
+        )
+
+        XCTAssertEqual(inactiveWaiting.statusRailColorName, "orange")
+        XCTAssertEqual(inactiveWaiting.railColorName, "orange")
+
+        let selectedWaiting = SessionTabRowVisualState.resolve(
+            descriptor: waiting,
+            activeSessionID: waiting.id
+        )
+
+        XCTAssertEqual(selectedWaiting.statusRailColorName, "orange")
+        XCTAssertEqual(selectedWaiting.railColorName, "accent")
+
+        let done = SessionDescriptor(ordinal: 2, agentStatus: .done)
+        let inactiveDone = SessionTabRowVisualState.resolve(
+            descriptor: done,
+            activeSessionID: UUID()
+        )
+
+        XCTAssertEqual(inactiveDone.statusRailColorName, "teal")
+        XCTAssertEqual(inactiveDone.railColorName, "teal")
     }
 }

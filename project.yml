@@ -50,8 +50,8 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         SWIFT_OBJC_BRIDGING_HEADER: app/launcher/native_terminal/MvxMac-Bridging-Header.h
         "OTHER_LDFLAGS[arch=*]": -lstdc++
-        MARKETING_VERSION: 0.1.4
-        CURRENT_PROJECT_VERSION: 4
+        MARKETING_VERSION: 0.2.0
+        CURRENT_PROJECT_VERSION: 5
         VERSIONING_SYSTEM: apple-generic
         ENABLE_HARDENED_RUNTIME: YES
         INFOPLIST_KEY_MVXLatestReleaseURL: https://github.com/Saewt/mvx/releases/latest/download/latest.json

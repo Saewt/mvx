@@ -137,17 +137,27 @@ final class WorkspaceNotesEditorController: ObservableObject {
 public struct WorkspaceNotesCardView: View {
     @ObservedObject private var workspace: SessionWorkspace
     private let metadata: WorkspaceMetadataSnapshot
+    private let externalPresentation: Binding<Bool>?
+    private let showsButton: Bool
     @StateObject private var controller: WorkspaceNotesEditorController
-    @State private var isPopoverPresented = false
+    @State private var internalPopoverPresented = false
     @FocusState private var isEditorFocused: Bool
 
-    public init(workspace: SessionWorkspace, metadata: WorkspaceMetadataSnapshot) {
+    public init(
+        workspace: SessionWorkspace,
+        metadata: WorkspaceMetadataSnapshot,
+        isPresented: Binding<Bool>? = nil,
+        showsButton: Bool = true
+    ) {
         self.workspace = workspace
         self.metadata = metadata
+        self.externalPresentation = isPresented
+        self.showsButton = showsButton
         _controller = StateObject(wrappedValue: WorkspaceNotesEditorController(workspace: workspace))
     }
 
     public var body: some View {
+        let presentation = presentationBinding
         let state = WorkspaceNotesCardState.resolve(
             note: workspace.activeScopeNote,
             metadata: metadata
@@ -159,44 +169,53 @@ public struct WorkspaceNotesCardView: View {
         let highlightColor = color(for: state.highlightColorName)
         let showsClearAction = state.showsClearAction || !controller.draftBody.isEmpty
 
-        Button(action: togglePopover) {
-            Image(systemName: "note.text")
-                .font(.system(size: 12, weight: .semibold))
-                .frame(width: 26, height: 26)
-                .background(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(
-                            isPopoverPresented
-                                ? (state.isHighlighted
-                                    ? highlightColor.opacity(0.18)
-                                    : Color.white.opacity(0.12))
-                                : (state.isHighlighted
-                                    ? highlightColor.opacity(0.10)
-                                    : Color.white.opacity(0.08))
+        Group {
+            if showsButton {
+                Button {
+                    presentation.wrappedValue.toggle()
+                } label: {
+                    Image(systemName: "note.text")
+                        .font(.system(size: MvxIcon.controlSymbolSize, weight: .semibold))
+                        .frame(width: MvxIcon.controlButtonSize, height: MvxIcon.controlButtonSize)
+                        .background(
+                            RoundedRectangle(cornerRadius: MvxRadius.control, style: .continuous)
+                                .fill(
+                                    presentation.wrappedValue
+                                        ? (state.isHighlighted
+                                            ? highlightColor.opacity(0.18)
+                                            : MvxSurface.hairlineStrong)
+                                        : (state.isHighlighted
+                                            ? highlightColor.opacity(0.10)
+                                            : MvxSurface.hairline)
+                                )
                         )
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(
-                            state.isHighlighted
-                                ? highlightColor.opacity(isPopoverPresented ? 0.55 : 0.36)
-                                : Color.white.opacity(isPopoverPresented ? 0.16 : 0.08),
-                            lineWidth: 1
+                        .overlay(
+                            RoundedRectangle(cornerRadius: MvxRadius.control, style: .continuous)
+                                .stroke(
+                                    state.isHighlighted
+                                        ? highlightColor.opacity(presentation.wrappedValue ? 0.55 : 0.36)
+                                        : Color.white.opacity(presentation.wrappedValue ? 0.16 : 0.08),
+                                    lineWidth: 1
+                                )
                         )
-                )
-                .overlay(alignment: .topTrailing) {
-                    if state.showsTriggerBadge {
-                        Circle()
-                            .fill(state.isHighlighted ? highlightColor : .accentColor)
-                            .frame(width: 7, height: 7)
-                            .offset(x: 2, y: -2)
-                    }
+                        .overlay(alignment: .topTrailing) {
+                            if state.showsTriggerBadge {
+                                Circle()
+                                    .fill(state.isHighlighted ? highlightColor : .accentColor)
+                                    .frame(width: 7, height: 7)
+                                    .offset(x: 2, y: -2)
+                            }
+                        }
                 }
+            } else {
+                Color.clear
+                    .frame(width: 0, height: 0)
+            }
         }
         .onAppear {
             controller.syncFromWorkspace()
         }
-        .popover(isPresented: $isPopoverPresented, arrowEdge: .top) {
+        .popover(isPresented: presentation, arrowEdge: .top) {
             popoverContent(
                 title: state.title,
                 scopeLabel: scopeLabel,
@@ -210,7 +229,7 @@ public struct WorkspaceNotesCardView: View {
             _ = newValue
             controller.syncFromWorkspace()
         }
-        .onChange(of: isPopoverPresented) { isPresented in
+        .onChange(of: presentation.wrappedValue) { isPresented in
             if isPresented {
                 controller.syncFromWorkspace()
                 DispatchQueue.main.async {
@@ -229,6 +248,13 @@ public struct WorkspaceNotesCardView: View {
         .help("Notes")
     }
 
+    private var presentationBinding: Binding<Bool> {
+        externalPresentation ?? Binding(
+            get: { internalPopoverPresented },
+            set: { internalPopoverPresented = $0 }
+        )
+    }
+
     private func actionButton(title: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
@@ -237,7 +263,7 @@ public struct WorkspaceNotesCardView: View {
                 .padding(.vertical, 3)
                 .background(
                     Capsule(style: .continuous)
-                        .fill(Color.white.opacity(0.08))
+                        .fill(MvxSurface.hairline)
                 )
         }
         .buttonStyle(.plain)
@@ -273,12 +299,12 @@ public struct WorkspaceNotesCardView: View {
             .frame(width: 304, height: 178)
             .padding(6)
             .background(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(Color.black.opacity(0.14))
+                RoundedRectangle(cornerRadius: MvxRadius.control, style: .continuous)
+                    .fill(MvxSurface.base)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                RoundedRectangle(cornerRadius: MvxRadius.control, style: .continuous)
+                    .stroke(MvxSurface.hairline, lineWidth: 1)
             )
             .overlay(alignment: .topLeading) {
                 if controller.draftBody.isEmpty {
@@ -296,10 +322,6 @@ public struct WorkspaceNotesCardView: View {
 
     private func clearNote() {
         controller.clear()
-    }
-
-    private func togglePopover() {
-        isPopoverPresented.toggle()
     }
 
     private func color(for colorName: String) -> Color {

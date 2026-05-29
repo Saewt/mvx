@@ -484,6 +484,13 @@ final class WorkspaceFileTreeTests: XCTestCase {
         XCTAssertEqual(controller.rootPath, secondDirectory.path)
     }
 
+    func testFileTreeSectionDefaultsToCollapsed() throws {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+        let controller = WorkspaceFileTreeController(workspace: workspace)
+
+        XCTAssertFalse(controller.isSectionExpanded)
+    }
+
     private func makeTemporaryDirectory() throws -> URL {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)

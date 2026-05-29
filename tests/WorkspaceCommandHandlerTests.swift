@@ -289,4 +289,148 @@ final class WorkspaceCommandHandlerTests: XCTestCase {
         XCTAssertFalse(handler.isUpdateSheetPresented)
         XCTAssertTrue(workspace.quitRequested)
     }
+
+    func testZoomPaneToggles() throws {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+        let handler = WorkspaceCommandHandler(workspace: workspace)
+
+        _ = handler.perform(.splitVertical)
+        XCTAssertEqual(workspace.workspaceGraph.paneCount, 2)
+        let focusedPane = try XCTUnwrap(workspace.focusedPaneID)
+
+        _ = handler.perform(.zoomPane)
+        XCTAssertEqual(handler.zoomedPaneID, focusedPane)
+        XCTAssertTrue(handler.isPaneZoomed)
+
+        _ = handler.perform(.zoomPane)
+        XCTAssertNil(handler.zoomedPaneID)
+        XCTAssertFalse(handler.isPaneZoomed)
+    }
+
+    func testZoomNoopWhenSinglePane() {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+        let handler = WorkspaceCommandHandler(workspace: workspace)
+
+        XCTAssertEqual(workspace.workspaceGraph.paneCount, 1)
+        XCTAssertNil(handler.zoomedPaneID)
+
+        _ = handler.perform(.zoomPane)
+        XCTAssertNil(handler.zoomedPaneID)
+    }
+
+    func testZoomClearsOnPaneClose() throws {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+        let handler = WorkspaceCommandHandler(workspace: workspace)
+
+        _ = handler.perform(.splitVertical)
+        _ = handler.perform(.zoomPane)
+        XCTAssertTrue(handler.isPaneZoomed)
+
+        _ = handler.perform(.closePane)
+        XCTAssertNil(handler.zoomedPaneID)
+        XCTAssertFalse(handler.isPaneZoomed)
+    }
+
+    func testZoomClearsOnSessionClose() throws {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+        let handler = WorkspaceCommandHandler(workspace: workspace)
+
+        _ = handler.perform(.splitVertical)
+        _ = handler.perform(.zoomPane)
+        XCTAssertTrue(handler.isPaneZoomed)
+
+        _ = handler.perform(.closeCurrentSession)
+        XCTAssertNil(handler.zoomedPaneID)
+        XCTAssertFalse(handler.isPaneZoomed)
+    }
+
+    func testZoomExitsOnFocusChange() throws {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+        let handler = WorkspaceCommandHandler(workspace: workspace)
+
+        _ = handler.perform(.splitVertical)
+        _ = handler.perform(.zoomPane)
+        XCTAssertTrue(handler.isPaneZoomed)
+
+        _ = handler.perform(.nextPane)
+        XCTAssertNil(handler.zoomedPaneID)
+    }
+
+    func testZoomExitsOnSplit() throws {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+        let handler = WorkspaceCommandHandler(workspace: workspace)
+
+        _ = handler.perform(.splitVertical)
+        _ = handler.perform(.zoomPane)
+        XCTAssertTrue(handler.isPaneZoomed)
+
+        _ = handler.perform(.splitHorizontal)
+        XCTAssertNil(handler.zoomedPaneID)
+    }
+
+    func testExitZoomClearsZoomedPane() throws {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+        let handler = WorkspaceCommandHandler(workspace: workspace)
+
+        _ = handler.perform(.splitVertical)
+        _ = handler.perform(.zoomPane)
+        XCTAssertTrue(handler.isPaneZoomed)
+
+        _ = handler.perform(.exitZoom)
+        XCTAssertNil(handler.zoomedPaneID)
+        XCTAssertFalse(handler.isPaneZoomed)
+
+        handler.exitZoom()
+        XCTAssertNil(handler.zoomedPaneID)
+    }
+
+    func testFocusModeToggle() {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+        let handler = WorkspaceCommandHandler(workspace: workspace)
+
+        XCTAssertFalse(handler.isFocusModeActive)
+
+        _ = handler.perform(.toggleFocusMode)
+        XCTAssertTrue(handler.isFocusModeActive)
+
+        _ = handler.perform(.toggleFocusMode)
+        XCTAssertFalse(handler.isFocusModeActive)
+    }
+
+    func testZoomPaneDescriptorStaysEnabledWhileZoomed() throws {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+        let handler = WorkspaceCommandHandler(workspace: workspace)
+
+        _ = handler.perform(.splitVertical)
+        _ = handler.perform(.zoomPane)
+        XCTAssertTrue(handler.isPaneZoomed)
+
+        var descriptors = Dictionary(uniqueKeysWithValues: handler.availableCommands().map { ($0.command, $0) })
+        XCTAssertTrue(try XCTUnwrap(descriptors[.zoomPane]).isEnabled)
+
+        handler.exitZoom()
+        XCTAssertFalse(handler.isPaneZoomed)
+
+        descriptors = Dictionary(uniqueKeysWithValues: handler.availableCommands().map { ($0.command, $0) })
+        XCTAssertTrue(try XCTUnwrap(descriptors[.zoomPane]).isEnabled)
+    }
+
+    func testZoomPaneExitsWhenStaleZoomOnSinglePane() throws {
+        let workspace = makeTestWorkspace(autoStartSessions: false)
+        let handler = WorkspaceCommandHandler(workspace: workspace)
+
+        _ = handler.perform(.splitVertical)
+        let zoomedPane = try XCTUnwrap(workspace.focusedPaneID)
+
+        _ = handler.perform(.zoomPane)
+        XCTAssertEqual(handler.zoomedPaneID, zoomedPane)
+
+        _ = workspace.focusNextPane()
+        _ = workspace.closeFocusedPane()
+        XCTAssertEqual(workspace.workspaceGraph.paneCount, 1)
+        XCTAssertEqual(workspace.focusedPaneID, zoomedPane)
+
+        _ = handler.perform(.zoomPane)
+        XCTAssertNil(handler.zoomedPaneID)
+    }
 }

@@ -22,6 +22,7 @@ final class AppearanceConfigTests: XCTestCase {
         XCTAssertEqual(configuration.fontFamily, RenderConfiguration.defaultFontFamily)
         XCTAssertEqual(configuration.fontSize, AppPreferences.minimumFontSize)
         XCTAssertEqual(configuration.colorPalette.backgroundHex, ThemePreset.catppuccin.colors.backgroundHex)
+        XCTAssertEqual(preferences.validated().sidebarWidth, AppPreferences.defaultSidebarWidth)
     }
 
     func testCustomFontAndColorOverridesTakePrecedence() {
@@ -51,7 +52,8 @@ final class AppearanceConfigTests: XCTestCase {
             themeName: "Dracula",
             fontFamily: "Monaco",
             fontSize: 14,
-            colorOverrides: ["cursor": "#ABCDEF"]
+            colorOverrides: ["cursor": "#ABCDEF"],
+            sidebarWidth: 312
         )
 
         try store.save(preferences)
@@ -85,8 +87,35 @@ final class AppearanceConfigTests: XCTestCase {
                 themeName: "Nord",
                 fontFamily: "Monaco",
                 fontSize: 14,
-                colorOverrides: ["cursor": "#ABCDEF"]
+                colorOverrides: ["cursor": "#ABCDEF"],
+                sidebarWidth: AppPreferences.defaultSidebarWidth
             )
         )
+    }
+
+    func testSidebarWidthClampsDuringValidation() {
+        XCTAssertEqual(
+            AppPreferences(sidebarWidth: 120).validated().sidebarWidth,
+            AppPreferences.minimumSidebarWidth
+        )
+        XCTAssertEqual(
+            AppPreferences(sidebarWidth: 900).validated().sidebarWidth,
+            AppPreferences.maximumSidebarWidth
+        )
+        XCTAssertEqual(AppPreferences(sidebarWidth: 312).validated().sidebarWidth, 312)
+    }
+
+    func testMissingSidebarWidthDecodesToDefault() throws {
+        let json = """
+        {
+            "themeName": "Catppuccin",
+            "fontSize": 13,
+            "colorOverrides": {}
+        }
+        """.data(using: .utf8)!
+
+        let decoded = try JSONDecoder().decode(AppPreferences.self, from: json)
+
+        XCTAssertEqual(decoded.sidebarWidth, AppPreferences.defaultSidebarWidth)
     }
 }

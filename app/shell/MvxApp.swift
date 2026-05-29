@@ -94,6 +94,7 @@ public struct MvxApp: App {
                 }
             }
         }
+        .windowStyle(.hiddenTitleBar)
         .commands {
             WorkspaceCommands(proxy: proxy)
         }
@@ -170,7 +171,7 @@ public struct NativeRuntimeUnavailableView: View {
         }
         .padding(28)
         .frame(minWidth: 860, minHeight: 520, alignment: .topLeading)
-        .background(Color(red: 0.09, green: 0.09, blue: 0.10))
+        .background(MvxSurface.base)
     }
 }
 
@@ -259,6 +260,20 @@ public struct WorkspaceCommands: Commands {
                 perform(.nextAttention)
             }
             .keyboardShortcut("n", modifiers: [.command, .shift])
+            .disabled(commandHandler == nil)
+
+            Divider()
+
+            Button("Zoom Pane") {
+                perform(.zoomPane)
+            }
+            .keyboardShortcut(.return, modifiers: .command)
+            .disabled(commandHandler == nil)
+
+            Button("Toggle Focus Mode") {
+                perform(.toggleFocusMode)
+            }
+            .keyboardShortcut("f", modifiers: [.command, .shift])
             .disabled(commandHandler == nil)
 
             Divider()
